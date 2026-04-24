@@ -1,0 +1,22 @@
+# macOS
+.DS_Store
+
+# Editors
+.idea/
+.vscode/
+
+# Environment
+.env
+.env.*
+
+# Rust
+target/
+.cargo-home/
+
+# Logs
+*.log
+
+# Repo-local AI agent guidance
+AGENTS.md
+docs/prompts/
+skills/

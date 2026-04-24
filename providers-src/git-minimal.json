@@ -1,0 +1,129 @@
+{
+  "provider_id": "builtin.git",
+  "description": "Minimal built-in git fixture for Phase 1 provider pipeline validation.",
+  "capabilities": {
+    "supports_static_commands": true,
+    "supports_dynamic_values": false,
+    "requires_subprocess": false
+  },
+  "root": {
+    "kind": "root",
+    "name": "git",
+    "summary": "Distributed version control.",
+    "aliases": [],
+    "hidden": false,
+    "deprecated": false,
+    "priority": 100,
+    "subcommands": [
+      {
+        "kind": "command",
+        "name": "checkout",
+        "summary": "Switch branches or restore working tree files.",
+        "aliases": [
+          "co"
+        ],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 90,
+        "subcommands": [],
+        "flags": [],
+        "positional_args": [
+          {
+            "name": "target",
+            "summary": "Branch, commit, or path to check out.",
+            "position": 0,
+            "required": false,
+            "repeatable": false,
+            "value": {
+              "slot_id": "checkout.target",
+              "source": {
+                "kind": "free_text",
+                "enum_values": [],
+                "dynamic_source": null
+              },
+              "quote_style": "backslash_escape"
+            }
+          }
+        ]
+      },
+      {
+        "kind": "command",
+        "name": "cherry-pick",
+        "summary": "Apply the changes introduced by existing commits.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 70,
+        "subcommands": [],
+        "flags": [],
+        "positional_args": [
+          {
+            "name": "commit",
+            "summary": "Commit to apply.",
+            "position": 0,
+            "required": true,
+            "repeatable": false,
+            "value": {
+              "slot_id": "cherry-pick.commit",
+              "source": {
+                "kind": "free_text",
+                "enum_values": [],
+                "dynamic_source": null
+              },
+              "quote_style": "backslash_escape"
+            }
+          }
+        ]
+      },
+      {
+        "kind": "command",
+        "name": "status",
+        "summary": "Show the working tree status.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 95,
+        "subcommands": [],
+        "flags": [
+          {
+            "long": "short",
+            "short": "s",
+            "aliases": [],
+            "summary": "Give the output in the short-format.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "conflicts_with": [],
+            "value": null
+          }
+        ],
+        "positional_args": []
+      }
+    ],
+    "flags": [
+      {
+        "long": "help",
+        "short": "h",
+        "aliases": [],
+        "summary": "Print help.",
+        "hidden": false,
+        "deprecated": false,
+        "repeatable": false,
+        "conflicts_with": [],
+        "value": null
+      },
+      {
+        "long": "version",
+        "short": null,
+        "aliases": [],
+        "summary": "Print version information.",
+        "hidden": false,
+        "deprecated": false,
+        "repeatable": false,
+        "conflicts_with": [],
+        "value": null
+      }
+    ],
+    "positional_args": []
+  }
+}

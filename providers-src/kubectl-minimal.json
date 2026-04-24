@@ -1,0 +1,323 @@
+{
+  "provider_id": "builtin.kubectl",
+  "description": "Minimal built-in kubectl fixture for Phase 3 multi-CLI validation.",
+  "capabilities": {
+    "supports_static_commands": true,
+    "supports_dynamic_values": false,
+    "requires_subprocess": false
+  },
+  "root": {
+    "kind": "root",
+    "name": "kubectl",
+    "summary": "Control the Kubernetes cluster manager.",
+    "aliases": [],
+    "hidden": false,
+    "deprecated": false,
+    "priority": 100,
+    "subcommands": [
+      {
+        "kind": "command",
+        "name": "get",
+        "summary": "Display one or many resources.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 100,
+        "subcommands": [
+          {
+            "kind": "command",
+            "name": "pods",
+            "summary": "List pods.",
+            "aliases": ["po"],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 95,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": []
+          },
+          {
+            "kind": "command",
+            "name": "deployments",
+            "summary": "List deployments.",
+            "aliases": ["deploy"],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 90,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": []
+          },
+          {
+            "kind": "command",
+            "name": "services",
+            "summary": "List services.",
+            "aliases": ["svc"],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 85,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": []
+          },
+          {
+            "kind": "command",
+            "name": "nodes",
+            "summary": "List nodes.",
+            "aliases": ["no"],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 80,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": []
+          },
+          {
+            "kind": "command",
+            "name": "namespaces",
+            "summary": "List namespaces.",
+            "aliases": ["ns"],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 75,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": []
+          }
+        ],
+        "flags": [
+          {
+            "long": "watch",
+            "short": "w",
+            "aliases": [],
+            "summary": "Watch for changes after listing.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "output",
+            "short": "o",
+            "aliases": [],
+            "summary": "Output format.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "conflicts_with": [],
+            "value": {
+              "slot_id": "get.output",
+              "source": {
+                "kind": "enum",
+                "enum_values": ["json", "yaml", "wide", "name"],
+                "dynamic_source": null
+              },
+              "quote_style": "backslash_escape"
+            }
+          }
+        ],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "describe",
+        "summary": "Show details of a resource.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 95,
+        "subcommands": [
+          {
+            "kind": "command",
+            "name": "pods",
+            "summary": "Describe a pod.",
+            "aliases": ["po"],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 95,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": []
+          },
+          {
+            "kind": "command",
+            "name": "deployments",
+            "summary": "Describe a deployment.",
+            "aliases": ["deploy"],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 85,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": []
+          }
+        ],
+        "flags": [],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "config",
+        "summary": "Modify kubeconfig files.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 90,
+        "subcommands": [
+          {
+            "kind": "command",
+            "name": "use-context",
+            "summary": "Set the current context.",
+            "aliases": [],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 95,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": []
+          },
+          {
+            "kind": "command",
+            "name": "set-context",
+            "summary": "Set a context entry in kubeconfig.",
+            "aliases": [],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 85,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": []
+          },
+          {
+            "kind": "command",
+            "name": "current-context",
+            "summary": "Display the current context.",
+            "aliases": [],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 80,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": []
+          }
+        ],
+        "flags": [],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "logs",
+        "summary": "Print the logs for a container in a pod.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 88,
+        "subcommands": [],
+        "flags": [
+          {
+            "long": "follow",
+            "short": "f",
+            "aliases": [],
+            "summary": "Specify if the logs should be streamed.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "conflicts_with": [],
+            "value": null
+          }
+        ],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "rollout",
+        "summary": "Manage the rollout of a resource.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 82,
+        "subcommands": [
+          {
+            "kind": "command",
+            "name": "status",
+            "summary": "Show rollout status.",
+            "aliases": [],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 90,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": []
+          },
+          {
+            "kind": "command",
+            "name": "restart",
+            "summary": "Restart a resource.",
+            "aliases": [],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 88,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": []
+          }
+        ],
+        "flags": [],
+        "positional_args": []
+      }
+    ],
+    "flags": [
+      {
+        "long": "namespace",
+        "short": "n",
+        "aliases": [],
+        "summary": "If present, the namespace scope for this CLI request.",
+        "hidden": false,
+        "deprecated": false,
+        "repeatable": false,
+        "conflicts_with": [],
+        "value": {
+          "slot_id": "root.namespace",
+          "source": {
+            "kind": "free_text",
+            "enum_values": [],
+            "dynamic_source": null
+          },
+          "quote_style": "backslash_escape"
+        }
+      },
+      {
+        "long": "context",
+        "short": null,
+        "aliases": [],
+        "summary": "The name of the kubeconfig context to use.",
+        "hidden": false,
+        "deprecated": false,
+        "repeatable": false,
+        "conflicts_with": [],
+        "value": {
+          "slot_id": "root.context",
+          "source": {
+            "kind": "free_text",
+            "enum_values": [],
+            "dynamic_source": null
+          },
+          "quote_style": "backslash_escape"
+        }
+      },
+      {
+        "long": "all-namespaces",
+        "short": "A",
+        "aliases": [],
+        "summary": "List the requested object(s) across all namespaces.",
+        "hidden": false,
+        "deprecated": false,
+        "repeatable": false,
+        "conflicts_with": [],
+        "value": null
+      }
+    ],
+    "positional_args": []
+  }
+}

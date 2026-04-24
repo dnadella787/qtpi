@@ -1,0 +1,16 @@
+[package]
+name = "twocp-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+postcard.workspace = true
+serde.workspace = true
+
+[lints]
+workspace = true
