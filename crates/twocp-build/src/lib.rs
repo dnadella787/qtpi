@@ -217,6 +217,7 @@ mod tests {
             hidden: false,
             deprecated: false,
             repeatable: false,
+            terminal: false,
             conflicts_with: Vec::new(),
             value: None,
         });

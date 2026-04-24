@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::fmt;
 use std::path::PathBuf;
@@ -10,7 +10,11 @@ use crate::artifact::{
 };
 use crate::parser::{CompletionPosition, ParseDegradedReason, ParseOutput};
 use crate::protocol::{ReplaceRange, SuggestRequest, SuggestionKind};
-use crate::spec::{CommandNode, CommandPath, DynamicLookupResult, ProviderId, SlotId};
+use crate::spec::{
+    CacheMode, CommandNode, CommandPath, DynamicLookupBudget, DynamicLookupRequest,
+    DynamicLookupResult, DynamicLookupScope, FlagSpec, ProviderId, QuoteStyle, SlotId,
+    ValueSourceKind, ValueSpec,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProviderQuery {
@@ -27,19 +31,17 @@ pub struct ProviderQuery {
 impl ProviderQuery {
     pub fn from_parse(request: &SuggestRequest, parse: &ParseOutput) -> Option<Self> {
         parse.provider_root.as_ref().map(|provider_id| {
-            let active_token_index = parse.active_token.index;
-            let trailing_unresolved_index =
-                unresolved_trailing_token_index(parse, active_token_index);
-            let active_index = active_token_index.or(trailing_unresolved_index);
             let command_tokens = parse
                 .tokens
                 .iter()
                 .enumerate()
                 .skip(1)
-                .filter(|(index, _)| Some(*index) != active_index)
+                .filter(|(index, _)| Some(*index) != parse.active_token.index)
                 .map(|(_, token)| token.text.clone())
                 .collect();
-            let (active_fragment, replace_range) = active_index
+            let (active_fragment, replace_range) = parse
+                .active_token
+                .index
                 .and_then(|index| parse.tokens.get(index))
                 .map(|token| (token.text.clone(), token.raw_range))
                 .unwrap_or((
@@ -65,7 +67,11 @@ impl ProviderQuery {
 pub struct ProviderScope {
     pub command_path: CommandPath,
     pub active_slot_id: Option<SlotId>,
+    pub active_value: Option<ValueSpec>,
+    pub lookup_scope: DynamicLookupScope,
     pub degraded: bool,
+    pub used_flags: BTreeSet<String>,
+    pub terminal_flag_seen: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -75,6 +81,8 @@ pub struct ProviderCandidate {
     pub annotation: Option<String>,
     pub kind: SuggestionKind,
     pub priority: u16,
+    pub requires_quoting: bool,
+    pub quote_style: QuoteStyle,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -141,6 +149,17 @@ pub trait Provider: Send + Sync {
     fn root_summary(&self) -> ProviderRootSummary;
     fn resolve_scope(&self, query: &ProviderQuery) -> ProviderScope;
     fn static_suggestions(&self, scope: &ProviderScope) -> Vec<ProviderCandidate>;
+    fn value_suggestions(&self, _scope: &ProviderScope) -> Vec<ProviderCandidate> {
+        Vec::new()
+    }
+    fn build_dynamic_lookup_request(
+        &self,
+        _query: &ProviderQuery,
+        _scope: &ProviderScope,
+        _max_candidates: usize,
+    ) -> Option<DynamicLookupRequest> {
+        None
+    }
     fn dynamic_value_provider(&self) -> Option<&dyn DynamicValueProvider> {
         None
     }
@@ -209,11 +228,23 @@ impl Provider for ArtifactProvider {
         let mut path = CommandPath::root();
         let mut current = self.root_node();
         let mut token_index = 0;
+        let mut positional_index = 0usize;
+        let mut pending_flag_value: Option<ValueSpec> = None;
+        let mut used_flags = BTreeSet::new();
+        let mut terminal_flag_seen = false;
 
         while token_index < query.command_tokens.len() {
             let token = &query.command_tokens[token_index];
-            if token.starts_with('-') {
-                if flag_expects_value(current, &self.root, token) {
+            if let Some(flag) = flag_for_token(current, &self.root, token) {
+                used_flags.insert(flag.long.clone());
+                terminal_flag_seen |= flag.terminal;
+                if let Some(value) = &flag.value {
+                    if token_index + 1 >= query.command_tokens.len() {
+                        pending_flag_value = Some(value.clone());
+                        token_index += 1;
+                        break;
+                    }
+
                     token_index += 2;
                 } else {
                     token_index += 1;
@@ -229,17 +260,64 @@ impl Provider for ArtifactProvider {
 
             path.push(next_node.name.clone());
             current = next_node;
+            positional_index = 0;
+            pending_flag_value = None;
+            token_index += 1;
+            continue;
+        }
+
+        while token_index < query.command_tokens.len() {
+            let token = &query.command_tokens[token_index];
+            if let Some(flag) = flag_for_token(current, &self.root, token) {
+                used_flags.insert(flag.long.clone());
+                terminal_flag_seen |= flag.terminal;
+                if flag.value.is_some() {
+                    token_index = (token_index + 2).min(query.command_tokens.len());
+                } else {
+                    token_index += 1;
+                }
+                continue;
+            }
+
+            if positional_argument_for_index(current, positional_index).is_none() {
+                break;
+            }
+
+            positional_index += 1;
             token_index += 1;
         }
 
+        let active_value = if query.completion_position == CompletionPosition::Value {
+            pending_flag_value.or_else(|| {
+                positional_argument_for_index(current, positional_index)
+                    .map(|argument| argument.value.clone())
+            })
+        } else {
+            None
+        };
+
         ProviderScope {
             command_path: path,
-            active_slot_id: query.active_slot_id.clone(),
+            active_slot_id: active_value.as_ref().map(|value| value.slot_id.clone()),
+            active_value,
+            lookup_scope: DynamicLookupScope {
+                namespace: None,
+                resource_kind: None,
+                profile: None,
+                region: None,
+                cwd: query.cwd.clone(),
+            },
             degraded: query.degraded_parse.is_some(),
+            used_flags,
+            terminal_flag_seen,
         }
     }
 
     fn static_suggestions(&self, scope: &ProviderScope) -> Vec<ProviderCandidate> {
+        if scope.terminal_flag_seen {
+            return Vec::new();
+        }
+
         let Some(node) = self.node_for_path(&scope.command_path) else {
             return Vec::new();
         };
@@ -254,20 +332,93 @@ impl Provider for ArtifactProvider {
                 annotation: child.summary.clone(),
                 kind: SuggestionKind::Command,
                 priority: child.priority,
+                requires_quoting: false,
+                quote_style: QuoteStyle::None,
             });
         let flags = node
             .flags
             .iter()
             .filter(|flag| !flag.hidden)
+            .filter(|flag| flag.repeatable || !scope.used_flags.contains(&flag.long))
+            .filter(|flag| {
+                !flag.conflicts_with
+                    .iter()
+                    .any(|conflict| scope.used_flags.contains(conflict))
+            })
             .map(|flag| ProviderCandidate {
                 replacement: format!("--{}", flag.long),
                 display: format!("--{}", flag.long),
                 annotation: flag.summary.clone(),
                 kind: SuggestionKind::Flag,
                 priority: 40,
+                requires_quoting: false,
+                quote_style: QuoteStyle::None,
             });
 
         subcommands.chain(flags).collect()
+    }
+
+    fn value_suggestions(&self, scope: &ProviderScope) -> Vec<ProviderCandidate> {
+        if scope.terminal_flag_seen {
+            return Vec::new();
+        }
+
+        let Some(value) = scope.active_value.as_ref() else {
+            return Vec::new();
+        };
+
+        if value.source.kind != ValueSourceKind::Enum {
+            return Vec::new();
+        }
+
+        value
+            .source
+            .enum_values
+            .iter()
+            .map(|entry| ProviderCandidate {
+                replacement: entry.clone(),
+                display: entry.clone(),
+                annotation: None,
+                kind: SuggestionKind::Value,
+                priority: 50,
+                requires_quoting: value_needs_quoting(entry),
+                quote_style: value.quote_style,
+            })
+            .collect()
+    }
+
+    fn build_dynamic_lookup_request(
+        &self,
+        query: &ProviderQuery,
+        scope: &ProviderScope,
+        max_candidates: usize,
+    ) -> Option<DynamicLookupRequest> {
+        if scope.terminal_flag_seen {
+            return None;
+        }
+
+        let value = scope.active_value.as_ref()?;
+        if value.source.kind != ValueSourceKind::Dynamic {
+            return None;
+        }
+
+        let dynamic_source = value.source.dynamic_source.as_ref()?;
+        let allow_stale_cache = dynamic_source.cache_policy.mode != CacheMode::ReadThrough
+            && dynamic_source.cache_policy.mode != CacheMode::None;
+
+        Some(DynamicLookupRequest {
+            provider_id: self.id().clone(),
+            command_path: scope.command_path.clone(),
+            slot_id: value.slot_id.clone(),
+            partial_input: query.active_fragment.clone(),
+            scope: scope.lookup_scope.clone(),
+            budget: DynamicLookupBudget {
+                timeout_ms: 120,
+                max_candidates: max_candidates.min(u16::MAX as usize) as u16,
+                allow_subprocess: true,
+            },
+            allow_stale_cache,
+        })
     }
 }
 
@@ -392,36 +543,59 @@ impl fmt::Display for RegistryError {
 
 impl Error for RegistryError {}
 
-fn unresolved_trailing_token_index(
-    parse: &ParseOutput,
-    active_token_index: Option<usize>,
-) -> Option<usize> {
-    if active_token_index.is_some() {
-        return None;
-    }
-
-    let trailing_index = parse.tokens.len().checked_sub(1)?;
-    if trailing_index == 0 {
-        return None;
-    }
-
-    let trailing = &parse.tokens[trailing_index];
-    if trailing.text.starts_with('-') {
-        return None;
-    }
-
-    Some(trailing_index)
+fn positional_argument_for_index(
+    node: &CommandNode,
+    positional_index: usize,
+) -> Option<&crate::spec::ArgumentSpec> {
+    node.positional_args.get(positional_index).or_else(|| {
+        node.positional_args
+            .last()
+            .filter(|argument| argument.repeatable)
+    })
 }
 
-fn flag_expects_value(current: &CommandNode, root: &CommandNode, token: &str) -> bool {
-    node_flag_expects_value(current, token) || node_flag_expects_value(root, token)
+fn flag_for_token<'a>(
+    current: &'a CommandNode,
+    root: &'a CommandNode,
+    token: &str,
+) -> Option<&'a FlagSpec> {
+    node_flag_for_token(current, token).or_else(|| node_flag_for_token(root, token))
 }
 
-fn node_flag_expects_value(node: &CommandNode, token: &str) -> bool {
-    node.flags.iter().any(|flag| {
+fn node_flag_for_token<'a>(node: &'a CommandNode, token: &str) -> Option<&'a FlagSpec> {
+    node.flags.iter().find(|flag| {
         let long_flag = format!("--{}", flag.long);
         let short_flag = flag.short.map(|short| format!("-{short}"));
-        (token == long_flag || short_flag.as_deref() == Some(token)) && flag.value.is_some()
+        token == long_flag
+            || short_flag.as_deref() == Some(token)
+            || flag.aliases.iter().any(|alias| token == alias)
+    })
+}
+
+fn value_needs_quoting(value: &str) -> bool {
+    value.chars().any(|ch| {
+        ch.is_whitespace()
+            || matches!(
+                ch,
+                '\'' | '"'
+                    | '\\'
+                    | '$'
+                    | '`'
+                    | '|'
+                    | '&'
+                    | ';'
+                    | '<'
+                    | '>'
+                    | '('
+                    | ')'
+                    | '['
+                    | ']'
+                    | '{'
+                    | '}'
+                    | '*'
+                    | '?'
+                    | '!'
+            )
     })
 }
 
@@ -484,6 +658,7 @@ mod tests {
                     hidden: false,
                     deprecated: false,
                     repeatable: false,
+                    terminal: true,
                     conflicts_with: Vec::new(),
                     value: None,
                 }],
@@ -504,16 +679,17 @@ mod tests {
     }
 
     #[test]
-    fn provider_query_repairs_trailing_unresolved_token_after_space() {
-        let request = SuggestRequest::minimal(ShellKind::Zsh, "git ch ", 7);
+    fn provider_query_opens_new_slot_after_trailing_space() {
+        let request = SuggestRequest::minimal(ShellKind::Zsh, "git status ", 11);
         let parse = parse_request(&request, &root_index());
         let query = ProviderQuery::from_parse(&request, &parse).expect("query should resolve");
-        assert_eq!(query.active_fragment, "ch");
+        assert_eq!(query.command_tokens, vec!["status".to_string()]);
+        assert_eq!(query.active_fragment, "");
         assert_eq!(
             query.replace_range,
             ReplaceRange {
-                start_byte: 4,
-                end_byte: 6,
+                start_byte: 11,
+                end_byte: 11,
             }
         );
     }
@@ -626,6 +802,7 @@ mod tests {
                     hidden: false,
                     deprecated: false,
                     repeatable: false,
+                    terminal: false,
                     conflicts_with: Vec::new(),
                     value: Some(crate::spec::ValueSpec {
                         slot_id: SlotId::from("root.namespace"),
@@ -665,5 +842,128 @@ mod tests {
             scope.command_path,
             CommandPath(vec!["get".to_string(), "pods".to_string()])
         );
+    }
+
+    #[test]
+    fn scope_resolution_honors_flag_aliases() {
+        let mut provider = sample_provider();
+        provider.root.flags.push(FlagSpec {
+            long: "porcelain".into(),
+            short: None,
+            aliases: vec!["--machine-readable".into()],
+            summary: Some("Machine readable output".into()),
+            hidden: false,
+            deprecated: false,
+            repeatable: false,
+            terminal: false,
+            conflicts_with: Vec::new(),
+            value: None,
+        });
+
+        let query = ProviderQuery {
+            provider_id: ProviderId::from("builtin.git"),
+            command_tokens: vec!["--machine-readable".into(), "status".into()],
+            completion_position: CompletionPosition::Value,
+            active_fragment: String::new(),
+            replace_range: ReplaceRange {
+                start_byte: 30,
+                end_byte: 30,
+            },
+            active_slot_id: None,
+            degraded_parse: None,
+            cwd: PathBuf::from("."),
+        };
+
+        let scope = provider.resolve_scope(&query);
+        assert_eq!(scope.command_path, CommandPath(vec!["status".to_string()]));
+    }
+
+    #[test]
+    fn static_suggestions_skip_non_repeatable_flags_that_are_already_used() {
+        let provider = ArtifactProvider::from_compiled(CompiledProviderArtifact {
+            provider: CompiledProviderMetadata {
+                provider_id: ProviderId::from("builtin.git"),
+                description: Some("git fixture".into()),
+                capabilities: ProviderCapabilities {
+                    supports_static_commands: true,
+                    supports_dynamic_values: false,
+                    requires_subprocess: false,
+                },
+            },
+            root: CommandNode {
+                kind: CommandNodeKind::Root,
+                name: "git".into(),
+                summary: None,
+                aliases: Vec::new(),
+                hidden: false,
+                deprecated: false,
+                priority: 100,
+                subcommands: vec![CommandNode {
+                    kind: CommandNodeKind::Command,
+                    name: "status".into(),
+                    summary: Some("Show status".into()),
+                    aliases: Vec::new(),
+                    hidden: false,
+                    deprecated: false,
+                    priority: 90,
+                    subcommands: Vec::new(),
+                    flags: vec![FlagSpec {
+                        long: "short".into(),
+                        short: Some('s'),
+                        aliases: Vec::new(),
+                        summary: Some("Short format".into()),
+                        hidden: false,
+                        deprecated: false,
+                        repeatable: false,
+                        terminal: false,
+                        conflicts_with: Vec::new(),
+                        value: None,
+                    }],
+                    positional_args: Vec::new(),
+                }],
+                flags: Vec::new(),
+                positional_args: Vec::new(),
+            },
+        });
+
+        let query = ProviderQuery {
+            provider_id: ProviderId::from("builtin.git"),
+            command_tokens: vec!["status".into(), "--short".into()],
+            completion_position: CompletionPosition::Value,
+            active_fragment: String::new(),
+            replace_range: ReplaceRange {
+                start_byte: 18,
+                end_byte: 18,
+            },
+            active_slot_id: None,
+            degraded_parse: None,
+            cwd: PathBuf::from("."),
+        };
+
+        let scope = provider.resolve_scope(&query);
+        let suggestions = provider.static_suggestions(&scope);
+        assert!(suggestions.is_empty());
+    }
+
+    #[test]
+    fn terminal_flags_stop_further_static_suggestions() {
+        let provider = sample_provider();
+        let query = ProviderQuery {
+            provider_id: ProviderId::from("builtin.git"),
+            command_tokens: vec!["--help".into(), "status".into()],
+            completion_position: CompletionPosition::Value,
+            active_fragment: String::new(),
+            replace_range: ReplaceRange {
+                start_byte: 18,
+                end_byte: 18,
+            },
+            active_slot_id: None,
+            degraded_parse: None,
+            cwd: PathBuf::from("."),
+        };
+
+        let scope = provider.resolve_scope(&query);
+        assert!(scope.terminal_flag_seen);
+        assert!(provider.static_suggestions(&scope).is_empty());
     }
 }

@@ -141,6 +141,13 @@ pub fn parse_request(request: &SuggestRequest, root_index: &ProviderRootIndex) -
         return ParseOutput::degraded(ParseDegradedReason::CursorOutOfBounds, request.buffer.len());
     }
 
+    if !request.buffer.is_char_boundary(request.cursor_byte_offset) {
+        return ParseOutput::degraded(
+            ParseDegradedReason::CursorOutOfBounds,
+            request.cursor_byte_offset,
+        );
+    }
+
     if request.buffer.contains('\n') || request.buffer.contains('\r') {
         return ParseOutput::degraded(
             ParseDegradedReason::MultilineBuffer,
@@ -148,19 +155,20 @@ pub fn parse_request(request: &SuggestRequest, root_index: &ProviderRootIndex) -
         );
     }
 
+    let parse_buffer = &request.buffer[..request.cursor_byte_offset];
     let mut tokens = Vec::new();
     let mut current: Option<TokenBuilder> = None;
     let mut quote_context = QuoteContext::Unquoted;
     let mut index = 0;
 
-    while index < request.buffer.len() {
-        let current_slice = &request.buffer[index..];
+    while index < parse_buffer.len() {
+        let current_slice = &parse_buffer[index..];
         let ch = current_slice
             .chars()
             .next()
             .expect("slice at valid index should have a char");
         let ch_len = ch.len_utf8();
-        let next_char = request.buffer[index + ch_len..].chars().next();
+        let next_char = parse_buffer[index + ch_len..].chars().next();
 
         if quote_context == QuoteContext::Unquoted {
             match ch {
@@ -336,9 +344,10 @@ pub fn parse_request(request: &SuggestRequest, root_index: &ProviderRootIndex) -
     }
 
     if let Some(builder) = current.take() {
-        tokens.push(builder.into_token(request.buffer.len()));
+        tokens.push(builder.into_token(parse_buffer.len()));
     }
 
+    extend_active_token_to_full_word(&request.buffer, request.cursor_byte_offset, &mut tokens);
     let active_token = determine_active_token(request.cursor_byte_offset, &tokens);
     let provider_root = tokens.first().and_then(|token| {
         root_index
@@ -356,6 +365,36 @@ pub fn parse_request(request: &SuggestRequest, root_index: &ProviderRootIndex) -
         provider_root,
         active_slot_id: None,
     }
+}
+
+fn extend_active_token_to_full_word(
+    buffer: &str,
+    cursor_byte_offset: usize,
+    tokens: &mut [ParsedToken],
+) {
+    let Some(token) = tokens
+        .iter_mut()
+        .find(|token| token.raw_range.end_byte == cursor_byte_offset)
+    else {
+        return;
+    };
+
+    if token.quote_context != QuoteContext::Unquoted {
+        return;
+    }
+
+    token.raw_range.end_byte = unquoted_token_end(buffer, cursor_byte_offset);
+}
+
+fn unquoted_token_end(buffer: &str, start_byte: usize) -> usize {
+    let mut end = start_byte;
+    for (relative_index, ch) in buffer[start_byte..].char_indices() {
+        if ch.is_whitespace() || matches!(ch, '|' | '&' | ';' | '<' | '>') {
+            return start_byte + relative_index;
+        }
+        end = start_byte + relative_index + ch.len_utf8();
+    }
+    end
 }
 
 fn determine_active_token(cursor_byte_offset: usize, tokens: &[ParsedToken]) -> ActiveToken {
@@ -519,6 +558,31 @@ mod tests {
         assert_eq!(
             parse_request(&kubectl, &root_index).provider_root,
             Some(ProviderId::from("builtin.kubectl"))
+        );
+    }
+
+    #[test]
+    fn parser_only_degrades_for_unsupported_syntax_before_cursor() {
+        let request = SuggestRequest::minimal(ShellKind::Zsh, "git st $(later)", 6);
+        let parse = parse_request(&request, &roots(&[("git", "builtin.git")]));
+
+        assert_eq!(parse.status, ParserStatus::Complete);
+        assert_eq!(parse.tokens.len(), 2);
+        assert_eq!(parse.active_token.value, "st");
+    }
+
+    #[test]
+    fn parser_replacement_range_covers_active_unquoted_suffix() {
+        let request = SuggestRequest::minimal(ShellKind::Zsh, "git checkout", 7);
+        let parse = parse_request(&request, &roots(&[("git", "builtin.git")]));
+
+        assert_eq!(parse.active_token.value, "che");
+        assert_eq!(
+            parse.active_token.raw_range,
+            ReplaceRange {
+                start_byte: 4,
+                end_byte: 12,
+            }
         );
     }
 }

@@ -102,6 +102,8 @@ pub struct FlagSpec {
     pub hidden: bool,
     pub deprecated: bool,
     pub repeatable: bool,
+    #[serde(default)]
+    pub terminal: bool,
     pub conflicts_with: Vec<String>,
     pub value: Option<ValueSpec>,
 }

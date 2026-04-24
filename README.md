@@ -6,16 +6,18 @@ The immediate target is a local installable tool that helps users discover and c
 
 ## Current Status
 
-Phase 3 is implemented as a multi-CLI built-in prototype with the first interactive `zsh` path. The workspace now includes the Phase 1 Rust-side foundation, a static suggestion engine for built-in `git` and `kubectl`, a shell-facing `twocp suggest` command, and a thin `zsh` bridge that renders suggestions below the prompt with shell-owned state.
+Phase 4 is implemented as a multi-CLI built-in prototype with the first interactive `zsh` path and the first bounded dynamic lookup. The workspace now includes the Phase 1 Rust-side foundation, a suggestion engine for built-in `git` and `kubectl`, a shell-facing `twocp suggest` command, a thin `zsh` bridge that renders suggestions below the prompt with shell-owned state, and a live `kubectl` pod-name lookup path with explicit cache and degraded-mode behavior.
 
 The current interactive path remains intentionally narrow:
 
 - `zsh` only
 - built-in `git` and `kubectl` fixtures
-- static command and subcommand suggestions only
-- explicit fallback to native completion via `Ctrl-X Tab`
+- static command and subcommand suggestions
+- enum-backed value suggestions such as `kubectl get --output `
+- dynamic pod-name lookup for `kubectl describe pod <name>` and `kubectl logs <pod>`
+- explicit 2cp keybindings that leave native completion unchanged
 
-External plugin runtime loading, dynamic value lookup, and additional CLIs remain future work.
+External plugin runtime loading and additional CLIs remain future work. Dynamic lookup is intentionally narrow in the current build and only covers the first `kubectl` pod-name slot.
 
 ## Technical Direction
 
@@ -48,7 +50,7 @@ cargo test --workspace
 
 ## Next Development Step
 
-Build Phase 4: add dynamic value lookup for high-value slots such as kubectl object names and other local context, with explicit cache, degradation, and timing behavior.
+Build Phase 5: harden packaging, doctor/debug flows, shell install and uninstall paths, and broader failure recovery around the existing `zsh` bridge and provider runtime.
 
 ## Zsh Prototype
 
@@ -62,11 +64,30 @@ source "$PWD/shell/zsh/twocp.zsh"
 
 Current interaction:
 
-- type `git ` to see built-in static suggestions
-- type `git ch` to narrow to `checkout` and `cherry-pick`
-- type `kubectl ` to see a broader static built-in command tree
-- type `kubectl get po` to narrow to `pods`
-- `Down` / `Up` move the selection while the menu is visible
-- `Tab` accepts the highlighted suggestion
-- `Esc` dismisses the menu
-- `Ctrl-X Tab` calls native `zsh` completion explicitly
+- type `git ` to auto-show built-in static suggestions
+- keep typing after `git `, such as `git ch`, to narrow to `checkout` and `cherry-pick`
+- after later spaces under a supported root, such as `git commit `, the menu reopens for the next flags or values
+- type `kubectl ` or `k ` to auto-show the built-in kubectl command tree
+- keep typing after `kubectl `, such as `kubectl get po`, to narrow to `pods`
+- after later spaces under kubectl, such as `kubectl get `, the menu reopens for the next resources or flags
+- type `kubectl describe pod `, then press `Ctrl-X 2 s` to trigger bounded live pod-name lookup
+- the selected row is rendered with an inverted highlight
+- `Down` / `Up` move the selection while the 2cp menu is visible, and otherwise keep their original shell behavior
+- `Ctrl-X 2 j` / `Ctrl-X 2 k` also move the selection while the 2cp menu is visible
+- `Enter` accepts the highlighted 2cp suggestion while the menu is visible, and otherwise keeps normal shell Enter behavior
+- `Ctrl-X 2 a` accepts the highlighted 2cp suggestion
+- `Ctrl-X 2 d` dismisses the 2cp menu
+- `Tab` and normal `zsh` completion remain owned by the user's existing shell setup
+
+The dropdown shows at most 5 rows by default while keeping a larger candidate
+set loaded for scrolling. Override visible rows with `TWOCP_MAX_ROWS` and the
+candidate cap with `TWOCP_MAX_SUGGESTIONS`.
+
+Auto-show roots default to `git`, `kubectl`, and `k`. Override them before
+sourcing the bridge with `TWOCP_AUTO_ROOTS`.
+
+The default 2cp keybindings can be overridden before sourcing the bridge with
+`TWOCP_KEY_SHOW`, `TWOCP_KEY_ACCEPT`, `TWOCP_KEY_DISMISS`, `TWOCP_KEY_NEXT`, and
+`TWOCP_KEY_PREVIOUS` using `bindkey` notation. `Enter` defaults to both `^M`
+and `^J`, and can be overridden with `TWOCP_KEY_ENTER` and
+`TWOCP_KEY_ENTER_ALT`.

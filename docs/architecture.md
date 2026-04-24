@@ -41,6 +41,8 @@ Phase 2 adds a repo-local `shell/zsh/twocp.zsh` bridge instead of a new shell cr
 
 Phase 3 keeps the same crate layout while adding a built-in provider-root index and a second validation CLI. Exact root discovery is now a small startup contract separate from provider instantiation, so the suggest path can select `git` or `kubectl` without eagerly deserializing unrelated providers.
 
+Phase 4 keeps the same crate layout while adding provider-scoped value-slot resolution, enum-backed value suggestions, and the first bounded dynamic lookup path for `kubectl` pod names. The current live lookup path stays single-process and stateless per request, so cache policy is explicit and persisted outside process memory instead of relying on a resident helper.
+
 ## Rendering Bias
 
 For the first interactive path, prefer shell-owned painting over Rust-owned terminal control.

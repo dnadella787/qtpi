@@ -7,6 +7,8 @@ use twocp_core::providers::{
 };
 use twocp_core::spec::ProviderId;
 
+use crate::kubectl::KubectlProvider;
+
 static GIT_MINIMAL_PROVIDER: &[u8] =
     include_bytes!(concat!(env!("OUT_DIR"), "/git-minimal.twocp-provider"));
 static KUBECTL_MINIMAL_PROVIDER: &[u8] =
@@ -65,13 +67,23 @@ impl ProviderCatalog for BuiltinCatalog {
             .get(provider_id)
             .copied()
             .ok_or_else(|| CatalogError::UnknownProvider(provider_id.clone()))?;
-        let provider = ArtifactProvider::from_bytes(bytes).map_err(|source| {
-            CatalogError::InvalidArtifact {
-                provider_id: provider_id.clone(),
-                source,
-            }
-        })?;
-        Ok(Box::new(provider))
+        if provider_id == &ProviderId::from("builtin.kubectl") {
+            let provider = KubectlProvider::from_bytes(bytes).map_err(|source| {
+                CatalogError::InvalidArtifact {
+                    provider_id: provider_id.clone(),
+                    source,
+                }
+            })?;
+            Ok(Box::new(provider))
+        } else {
+            let provider = ArtifactProvider::from_bytes(bytes).map_err(|source| {
+                CatalogError::InvalidArtifact {
+                    provider_id: provider_id.clone(),
+                    source,
+                }
+            })?;
+            Ok(Box::new(provider))
+        }
     }
 }
 

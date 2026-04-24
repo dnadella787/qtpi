@@ -17,6 +17,76 @@
     "subcommands": [
       {
         "kind": "command",
+        "name": "add",
+        "summary": "Add file contents to the index.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 98,
+        "subcommands": [],
+        "flags": [],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "status",
+        "summary": "Show the working tree status.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 97,
+        "subcommands": [],
+        "flags": [
+          {
+            "long": "short",
+            "short": "s",
+            "aliases": [],
+            "summary": "Give the output in the short-format.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          }
+        ],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "commit",
+        "summary": "Record changes to the repository.",
+        "aliases": ["ci"],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 96,
+        "subcommands": [],
+        "flags": [
+          {
+            "long": "message",
+            "short": "m",
+            "aliases": [],
+            "summary": "Use the given message as the commit message.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": {
+              "slot_id": "commit.message",
+              "source": {
+                "kind": "free_text",
+                "enum_values": [],
+                "dynamic_source": null
+              },
+              "quote_style": "backslash_escape"
+            }
+          }
+        ],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
         "name": "checkout",
         "summary": "Switch branches or restore working tree files.",
         "aliases": [
@@ -24,7 +94,7 @@
         ],
         "hidden": false,
         "deprecated": false,
-        "priority": 90,
+        "priority": 95,
         "subcommands": [],
         "flags": [],
         "positional_args": [
@@ -45,6 +115,90 @@
             }
           }
         ]
+      },
+      {
+        "kind": "command",
+        "name": "branch",
+        "summary": "List, create, or delete branches.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 94,
+        "subcommands": [],
+        "flags": [],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "log",
+        "summary": "Show commit logs.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 93,
+        "subcommands": [],
+        "flags": [],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "diff",
+        "summary": "Show changes between commits, commit and working tree, etc.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 92,
+        "subcommands": [],
+        "flags": [],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "pull",
+        "summary": "Fetch from and integrate with another repository or branch.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 91,
+        "subcommands": [],
+        "flags": [],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "push",
+        "summary": "Update remote refs along with associated objects.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 90,
+        "subcommands": [],
+        "flags": [],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "merge",
+        "summary": "Join two or more development histories together.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 89,
+        "subcommands": [],
+        "flags": [],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "rebase",
+        "summary": "Reapply commits on top of another base tip.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 88,
+        "subcommands": [],
+        "flags": [],
+        "positional_args": []
       },
       {
         "kind": "command",
@@ -74,30 +228,6 @@
             }
           }
         ]
-      },
-      {
-        "kind": "command",
-        "name": "status",
-        "summary": "Show the working tree status.",
-        "aliases": [],
-        "hidden": false,
-        "deprecated": false,
-        "priority": 95,
-        "subcommands": [],
-        "flags": [
-          {
-            "long": "short",
-            "short": "s",
-            "aliases": [],
-            "summary": "Give the output in the short-format.",
-            "hidden": false,
-            "deprecated": false,
-            "repeatable": false,
-            "conflicts_with": [],
-            "value": null
-          }
-        ],
-        "positional_args": []
       }
     ],
     "flags": [
@@ -109,6 +239,7 @@
         "hidden": false,
         "deprecated": false,
         "repeatable": false,
+        "terminal": true,
         "conflicts_with": [],
         "value": null
       },
@@ -120,6 +251,7 @@
         "hidden": false,
         "deprecated": false,
         "repeatable": false,
+        "terminal": true,
         "conflicts_with": [],
         "value": null
       }

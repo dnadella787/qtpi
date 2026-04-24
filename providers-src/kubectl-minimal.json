@@ -1,10 +1,10 @@
 {
   "provider_id": "builtin.kubectl",
-  "description": "Minimal built-in kubectl fixture for Phase 3 multi-CLI validation.",
+  "description": "Minimal built-in kubectl fixture for Phase 4 dynamic lookup validation.",
   "capabilities": {
     "supports_static_commands": true,
-    "supports_dynamic_values": false,
-    "requires_subprocess": false
+    "supports_dynamic_values": true,
+    "requires_subprocess": true
   },
   "root": {
     "kind": "root",
@@ -132,13 +132,37 @@
             "kind": "command",
             "name": "pods",
             "summary": "Describe a pod.",
-            "aliases": ["po"],
+            "aliases": ["po", "pod"],
             "hidden": false,
             "deprecated": false,
             "priority": 95,
             "subcommands": [],
             "flags": [],
-            "positional_args": []
+            "positional_args": [
+              {
+                "name": "name",
+                "summary": "Pod name.",
+                "position": 0,
+                "required": false,
+                "repeatable": false,
+                "value": {
+                  "slot_id": "kubectl.describe.pod.name",
+                  "source": {
+                    "kind": "dynamic",
+                    "enum_values": [],
+                    "dynamic_source": {
+                      "lookup_class": "resource_name",
+                      "cache_policy": {
+                        "mode": "prefer_cache",
+                        "ttl_ms": 5000
+                      },
+                      "cost": "bounded_subprocess"
+                    }
+                  },
+                  "quote_style": "backslash_escape"
+                }
+              }
+            ]
           },
           {
             "kind": "command",
@@ -227,7 +251,31 @@
             "value": null
           }
         ],
-        "positional_args": []
+        "positional_args": [
+          {
+            "name": "pod",
+            "summary": "Pod to inspect logs from.",
+            "position": 0,
+            "required": false,
+            "repeatable": false,
+            "value": {
+              "slot_id": "kubectl.logs.pod.name",
+              "source": {
+                "kind": "dynamic",
+                "enum_values": [],
+                "dynamic_source": {
+                  "lookup_class": "resource_name",
+                  "cache_policy": {
+                    "mode": "prefer_cache",
+                    "ttl_ms": 5000
+                  },
+                  "cost": "bounded_subprocess"
+                }
+              },
+              "quote_style": "backslash_escape"
+            }
+          }
+        ]
       },
       {
         "kind": "command",
@@ -298,6 +346,25 @@
         "conflicts_with": [],
         "value": {
           "slot_id": "root.context",
+          "source": {
+            "kind": "free_text",
+            "enum_values": [],
+            "dynamic_source": null
+          },
+          "quote_style": "backslash_escape"
+        }
+      },
+      {
+        "long": "kubeconfig",
+        "short": null,
+        "aliases": [],
+        "summary": "Path to the kubeconfig file to use.",
+        "hidden": false,
+        "deprecated": false,
+        "repeatable": false,
+        "conflicts_with": [],
+        "value": {
+          "slot_id": "root.kubeconfig",
           "source": {
             "kind": "free_text",
             "enum_values": [],

@@ -1,4 +1,5 @@
 mod builtins;
+mod kubectl;
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -13,7 +14,7 @@ use twocp_core::protocol::{
 #[derive(Parser)]
 #[command(
     name = "twocp",
-    about = "Phase 3 multi-CLI shell bridge surface for 2cp"
+    about = "Phase 4 multi-CLI shell bridge and dynamic lookup surface for 2cp"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -91,7 +92,7 @@ fn main() -> Result<()> {
             format,
             max_suggestions,
         } => {
-            let shell = parse_shell_kind(&shell);
+            let shell = parse_shell_kind(&shell)?;
             let cursor_byte_offset = match cursor_units {
                 CursorUnits::Bytes => cursor,
                 CursorUnits::Chars => char_offset_to_byte_offset(&buffer, cursor)?,
@@ -119,7 +120,7 @@ fn main() -> Result<()> {
                     println!("{}", serde_json::to_string(&response)?);
                 }
                 "zsh" => {
-                    print!("{}", render_zsh_response(&response, &buffer)?);
+                    print!("{}", render_zsh_response(&response, &buffer, cursor)?);
                 }
                 other => {
                     bail!("unsupported suggest output format: {other}");
@@ -131,10 +132,10 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn parse_shell_kind(shell: &str) -> ShellKind {
+fn parse_shell_kind(shell: &str) -> Result<ShellKind> {
     match shell {
-        "zsh" => ShellKind::Zsh,
-        _ => ShellKind::Zsh,
+        "zsh" => Ok(ShellKind::Zsh),
+        _ => bail!("unsupported shell: {shell}"),
     }
 }
 
@@ -182,7 +183,11 @@ fn byte_offset_to_char_offset(buffer: &str, byte_offset: usize) -> Result<usize>
     Ok(buffer[..byte_offset].chars().count())
 }
 
-fn render_zsh_response(response: &SuggestResponse, buffer: &str) -> Result<String> {
+fn render_zsh_response(
+    response: &SuggestResponse,
+    buffer: &str,
+    cursor_char_offset: usize,
+) -> Result<String> {
     let mut output = String::new();
     let (replace_start, replace_end) = match response.replace_range {
         Some(range) => byte_range_to_char_range(buffer, range)?,
@@ -200,6 +205,36 @@ fn render_zsh_response(response: &SuggestResponse, buffer: &str) -> Result<Strin
         .as_ref()
         .map(|diagnostics| format!("{:?}", diagnostics.parser_status).to_ascii_lowercase())
         .unwrap_or_else(|| "unknown".to_string());
+    let dynamic_slot_id = response
+        .diagnostics
+        .as_ref()
+        .and_then(|diagnostics| diagnostics.dynamic_lookup.as_ref())
+        .map(|lookup| lookup.slot_id.as_str())
+        .unwrap_or("");
+    let lookup_status = response
+        .diagnostics
+        .as_ref()
+        .and_then(|diagnostics| diagnostics.dynamic_lookup.as_ref())
+        .map(|lookup| format!("{:?}", lookup.status).to_ascii_lowercase())
+        .unwrap_or_else(|| "not_checked".to_string());
+    let cache_status = response
+        .diagnostics
+        .as_ref()
+        .and_then(|diagnostics| diagnostics.dynamic_lookup.as_ref())
+        .map(|lookup| format!("{:?}", lookup.cache_status).to_ascii_lowercase())
+        .unwrap_or_else(|| "not_checked".to_string());
+    let lookup_count = response
+        .diagnostics
+        .as_ref()
+        .and_then(|diagnostics| diagnostics.dynamic_lookup.as_ref())
+        .map(|lookup| lookup.match_count)
+        .unwrap_or_default();
+    let lookup_time_ms = response
+        .diagnostics
+        .as_ref()
+        .and_then(|diagnostics| diagnostics.dynamic_lookup.as_ref())
+        .map(|lookup| lookup.lookup_time_ms)
+        .unwrap_or_default();
 
     output.push_str(&format!(
         "typeset -g __twocp_status={}\n",
@@ -215,11 +250,22 @@ fn render_zsh_response(response: &SuggestResponse, buffer: &str) -> Result<Strin
 typeset -gi __twocp_replace_end={replace_end}\n\
 typeset -gi __twocp_selection_index={selection_index}\n\
 typeset -gi __twocp_truncated_count={}\n\
+typeset -gi __twocp_request_cursor={cursor_char_offset}\n\
+typeset -gi __twocp_lookup_count={lookup_count}\n\
+typeset -gi __twocp_lookup_time_ms={lookup_time_ms}\n\
 typeset -g __twocp_provider_id={}\n\
-typeset -g __twocp_parser_status={}\n",
+typeset -g __twocp_parser_status={}\n\
+typeset -g __twocp_request_buffer={}\n\
+typeset -g __twocp_dynamic_slot_id={}\n\
+typeset -g __twocp_lookup_status={}\n\
+typeset -g __twocp_cache_status={}\n",
         response.render_model.truncated_count,
         shell_quote(provider_id),
         shell_quote(&parser_status),
+        shell_quote(buffer),
+        shell_quote(dynamic_slot_id),
+        shell_quote(&lookup_status),
+        shell_quote(&cache_status),
     ));
 
     output.push_str("typeset -ga __twocp_insert_texts=(");

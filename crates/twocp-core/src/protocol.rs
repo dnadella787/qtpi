@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use crate::parser::ParserStatus;
-use crate::spec::ProviderId;
+use crate::spec::{CacheStatus, DynamicLookupScope, DynamicLookupStatus, ProviderId, SlotId};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -158,7 +158,18 @@ pub enum ResponseStatus {
 pub struct TimingDiagnostics {
     pub parse_ms: u32,
     pub provider_ms: u32,
+    pub dynamic_lookup_ms: u32,
     pub total_ms: u32,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DynamicLookupDiagnostics {
+    pub slot_id: SlotId,
+    pub scope: DynamicLookupScope,
+    pub cache_status: CacheStatus,
+    pub status: DynamicLookupStatus,
+    pub match_count: usize,
+    pub lookup_time_ms: u32,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -166,6 +177,7 @@ pub struct Diagnostics {
     pub provider_id: Option<ProviderId>,
     pub parser_status: ParserStatus,
     pub timings: TimingDiagnostics,
+    pub dynamic_lookup: Option<DynamicLookupDiagnostics>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
