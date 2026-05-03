@@ -1,10 +1,10 @@
 {
   "provider_id": "builtin.git",
-  "description": "Minimal built-in git fixture for Phase 1 provider pipeline validation.",
+  "description": "Curated built-in git provider for canonical command discovery and branch-aware value lookup.",
   "capabilities": {
     "supports_static_commands": true,
-    "supports_dynamic_values": false,
-    "requires_subprocess": false
+    "supports_dynamic_values": true,
+    "requires_subprocess": true
   },
   "root": {
     "kind": "root",
@@ -22,15 +22,232 @@
         "aliases": [],
         "hidden": false,
         "deprecated": false,
-        "priority": 98,
+        "priority": 100,
         "subcommands": [],
-        "flags": [],
+        "flags": [
+          {
+            "long": "patch",
+            "short": "p",
+            "aliases": [],
+            "summary": "Interactively choose hunks to stage.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "all",
+            "short": "A",
+            "aliases": [],
+            "summary": "Stage all tracked and untracked changes.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "update",
+            "short": "u",
+            "aliases": [],
+            "summary": "Update tracked files only.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          }
+        ],
         "positional_args": []
       },
       {
         "kind": "command",
-        "name": "status",
-        "summary": "Show the working tree status.",
+        "name": "branch",
+        "summary": "List, create, or delete branches.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 99,
+        "subcommands": [],
+        "flags": [
+          {
+            "long": "all",
+            "short": "a",
+            "aliases": [],
+            "summary": "List both local and remote-tracking branches.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "delete",
+            "short": "d",
+            "aliases": [],
+            "summary": "Delete a branch.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "move",
+            "short": "m",
+            "aliases": [],
+            "summary": "Move or rename a branch.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "show-current",
+            "short": null,
+            "aliases": [],
+            "summary": "Print the current branch name.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          }
+        ],
+        "positional_args": [
+          {
+            "name": "branch",
+            "summary": "Branch to create or inspect.",
+            "position": 0,
+            "required": false,
+            "repeatable": false,
+            "value": {
+              "slot_id": "git.branch.name",
+              "source": {
+                "kind": "dynamic",
+                "enum_values": [],
+                "dynamic_source": {
+                  "lookup_class": "branch",
+                  "cache_policy": {
+                    "mode": "prefer_cache",
+                    "ttl_ms": 5000
+                  },
+                  "cost": "bounded_subprocess"
+                }
+              },
+              "quote_style": "backslash_escape"
+            }
+          }
+        ]
+      },
+      {
+        "kind": "command",
+        "name": "checkout",
+        "summary": "Switch branches or restore working tree files.",
+        "aliases": [
+          "co"
+        ],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 98,
+        "subcommands": [],
+        "flags": [
+          {
+            "long": "detach",
+            "short": null,
+            "aliases": [],
+            "summary": "Detach HEAD at the named commit.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "track",
+            "short": "t",
+            "aliases": [],
+            "summary": "Set up branch tracking.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "force",
+            "short": "f",
+            "aliases": [],
+            "summary": "Proceed even when paths differ from index.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "branch",
+            "short": "b",
+            "aliases": [],
+            "summary": "Create and switch to a new branch.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": {
+              "slot_id": "git.checkout.new_branch",
+              "source": {
+                "kind": "free_text",
+                "enum_values": [],
+                "dynamic_source": null
+              },
+              "quote_style": "backslash_escape"
+            }
+          }
+        ],
+        "positional_args": [
+          {
+            "name": "target",
+            "summary": "Branch or commit to check out.",
+            "position": 0,
+            "required": false,
+            "repeatable": false,
+            "value": {
+              "slot_id": "git.checkout.target",
+              "source": {
+                "kind": "dynamic",
+                "enum_values": [],
+                "dynamic_source": {
+                  "lookup_class": "branch",
+                  "cache_policy": {
+                    "mode": "prefer_cache",
+                    "ttl_ms": 5000
+                  },
+                  "cost": "bounded_subprocess"
+                }
+              },
+              "quote_style": "backslash_escape"
+            }
+          }
+        ]
+      },
+      {
+        "kind": "command",
+        "name": "switch",
+        "summary": "Switch branches.",
         "aliases": [],
         "hidden": false,
         "deprecated": false,
@@ -38,10 +255,139 @@
         "subcommands": [],
         "flags": [
           {
-            "long": "short",
-            "short": "s",
+            "long": "create",
+            "short": "c",
             "aliases": [],
-            "summary": "Give the output in the short-format.",
+            "summary": "Create and switch to a new branch.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": {
+              "slot_id": "git.switch.create",
+              "source": {
+                "kind": "free_text",
+                "enum_values": [],
+                "dynamic_source": null
+              },
+              "quote_style": "backslash_escape"
+            }
+          },
+          {
+            "long": "detach",
+            "short": "d",
+            "aliases": [],
+            "summary": "Switch to a detached HEAD.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "force-create",
+            "short": "C",
+            "aliases": [],
+            "summary": "Create or reset the named branch.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": {
+              "slot_id": "git.switch.force_create",
+              "source": {
+                "kind": "free_text",
+                "enum_values": [],
+                "dynamic_source": null
+              },
+              "quote_style": "backslash_escape"
+            }
+          }
+        ],
+        "positional_args": [
+          {
+            "name": "branch",
+            "summary": "Branch to switch to.",
+            "position": 0,
+            "required": false,
+            "repeatable": false,
+            "value": {
+              "slot_id": "git.switch.branch",
+              "source": {
+                "kind": "dynamic",
+                "enum_values": [],
+                "dynamic_source": {
+                  "lookup_class": "branch",
+                  "cache_policy": {
+                    "mode": "prefer_cache",
+                    "ttl_ms": 5000
+                  },
+                  "cost": "bounded_subprocess"
+                }
+              },
+              "quote_style": "backslash_escape"
+            }
+          }
+        ]
+      },
+      {
+        "kind": "command",
+        "name": "clone",
+        "summary": "Clone a repository into a new directory.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 96,
+        "subcommands": [],
+        "flags": [
+          {
+            "long": "branch",
+            "short": "b",
+            "aliases": [],
+            "summary": "Checkout the named branch instead of HEAD.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": {
+              "slot_id": "git.clone.branch",
+              "source": {
+                "kind": "free_text",
+                "enum_values": [],
+                "dynamic_source": null
+              },
+              "quote_style": "backslash_escape"
+            }
+          },
+          {
+            "long": "depth",
+            "short": null,
+            "aliases": [],
+            "summary": "Create a shallow clone with a history truncated to the specified number of commits.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": {
+              "slot_id": "git.clone.depth",
+              "source": {
+                "kind": "free_text",
+                "enum_values": [],
+                "dynamic_source": null
+              },
+              "quote_style": "backslash_escape"
+            }
+          },
+          {
+            "long": "recurse-submodules",
+            "short": null,
+            "aliases": [],
+            "summary": "Initialize submodules in the clone.",
             "hidden": false,
             "deprecated": false,
             "repeatable": false,
@@ -56,10 +402,12 @@
         "kind": "command",
         "name": "commit",
         "summary": "Record changes to the repository.",
-        "aliases": ["ci"],
+        "aliases": [
+          "ci"
+        ],
         "hidden": false,
         "deprecated": false,
-        "priority": 96,
+        "priority": 95,
         "subcommands": [],
         "flags": [
           {
@@ -73,7 +421,51 @@
             "terminal": false,
             "conflicts_with": [],
             "value": {
-              "slot_id": "commit.message",
+              "slot_id": "git.commit.message",
+              "source": {
+                "kind": "free_text",
+                "enum_values": [],
+                "dynamic_source": null
+              },
+              "quote_style": "backslash_escape"
+            }
+          },
+          {
+            "long": "all",
+            "short": "a",
+            "aliases": [],
+            "summary": "Stage modified and deleted files before committing.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "amend",
+            "short": null,
+            "aliases": [],
+            "summary": "Amend the tip of the current branch.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "fixup",
+            "short": null,
+            "aliases": [],
+            "summary": "Create a fixup commit for autosquash.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": {
+              "slot_id": "git.commit.fixup",
               "source": {
                 "kind": "free_text",
                 "enum_values": [],
@@ -87,25 +479,124 @@
       },
       {
         "kind": "command",
-        "name": "checkout",
-        "summary": "Switch branches or restore working tree files.",
-        "aliases": [
-          "co"
-        ],
+        "name": "diff",
+        "summary": "Show changes between commits, commit and working tree, and more.",
+        "aliases": [],
         "hidden": false,
         "deprecated": false,
-        "priority": 95,
+        "priority": 94,
         "subcommands": [],
-        "flags": [],
-        "positional_args": [
+        "flags": [
           {
-            "name": "target",
-            "summary": "Branch, commit, or path to check out.",
-            "position": 0,
-            "required": false,
+            "long": "cached",
+            "short": null,
+            "aliases": [],
+            "summary": "Show the staged changes.",
+            "hidden": false,
+            "deprecated": false,
             "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "stat",
+            "short": null,
+            "aliases": [],
+            "summary": "Generate a diffstat.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "name-only",
+            "short": null,
+            "aliases": [],
+            "summary": "Show only names of changed files.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          }
+        ],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "fetch",
+        "summary": "Download objects and refs from another repository.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 93,
+        "subcommands": [],
+        "flags": [
+          {
+            "long": "all",
+            "short": null,
+            "aliases": [],
+            "summary": "Fetch all remotes.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "prune",
+            "short": "p",
+            "aliases": [],
+            "summary": "Remove stale remote-tracking references.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          }
+        ],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "init",
+        "summary": "Create an empty Git repository or reinitialize an existing one.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 92,
+        "subcommands": [],
+        "flags": [
+          {
+            "long": "bare",
+            "short": null,
+            "aliases": [],
+            "summary": "Create a bare repository.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "initial-branch",
+            "short": "b",
+            "aliases": [],
+            "summary": "Use the specified name for the initial branch.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
             "value": {
-              "slot_id": "checkout.target",
+              "slot_id": "git.init.initial_branch",
               "source": {
                 "kind": "free_text",
                 "enum_values": [],
@@ -114,18 +605,7 @@
               "quote_style": "backslash_escape"
             }
           }
-        ]
-      },
-      {
-        "kind": "command",
-        "name": "branch",
-        "summary": "List, create, or delete branches.",
-        "aliases": [],
-        "hidden": false,
-        "deprecated": false,
-        "priority": 94,
-        "subcommands": [],
-        "flags": [],
+        ],
         "positional_args": []
       },
       {
@@ -135,45 +615,46 @@
         "aliases": [],
         "hidden": false,
         "deprecated": false,
-        "priority": 93,
-        "subcommands": [],
-        "flags": [],
-        "positional_args": []
-      },
-      {
-        "kind": "command",
-        "name": "diff",
-        "summary": "Show changes between commits, commit and working tree, etc.",
-        "aliases": [],
-        "hidden": false,
-        "deprecated": false,
-        "priority": 92,
-        "subcommands": [],
-        "flags": [],
-        "positional_args": []
-      },
-      {
-        "kind": "command",
-        "name": "pull",
-        "summary": "Fetch from and integrate with another repository or branch.",
-        "aliases": [],
-        "hidden": false,
-        "deprecated": false,
         "priority": 91,
         "subcommands": [],
-        "flags": [],
-        "positional_args": []
-      },
-      {
-        "kind": "command",
-        "name": "push",
-        "summary": "Update remote refs along with associated objects.",
-        "aliases": [],
-        "hidden": false,
-        "deprecated": false,
-        "priority": 90,
-        "subcommands": [],
-        "flags": [],
+        "flags": [
+          {
+            "long": "oneline",
+            "short": null,
+            "aliases": [],
+            "summary": "Condense each commit to a single line.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "graph",
+            "short": null,
+            "aliases": [],
+            "summary": "Draw an ASCII graph of branch history.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "decorate",
+            "short": null,
+            "aliases": [],
+            "summary": "Print ref names of any commits shown.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          }
+        ],
         "positional_args": []
       },
       {
@@ -183,9 +664,156 @@
         "aliases": [],
         "hidden": false,
         "deprecated": false,
+        "priority": 90,
+        "subcommands": [],
+        "flags": [
+          {
+            "long": "ff-only",
+            "short": null,
+            "aliases": [],
+            "summary": "Resolve the merge as a fast-forward if possible.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "no-ff",
+            "short": null,
+            "aliases": [],
+            "summary": "Create a merge commit even when fast-forward is possible.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "abort",
+            "short": null,
+            "aliases": [],
+            "summary": "Abort the current conflict resolution process.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": true,
+            "conflicts_with": [],
+            "value": null
+          }
+        ],
+        "positional_args": [
+          {
+            "name": "branch",
+            "summary": "Branch to merge into the current branch.",
+            "position": 0,
+            "required": false,
+            "repeatable": false,
+            "value": {
+              "slot_id": "git.merge.branch",
+              "source": {
+                "kind": "dynamic",
+                "enum_values": [],
+                "dynamic_source": {
+                  "lookup_class": "branch",
+                  "cache_policy": {
+                    "mode": "prefer_cache",
+                    "ttl_ms": 5000
+                  },
+                  "cost": "bounded_subprocess"
+                }
+              },
+              "quote_style": "backslash_escape"
+            }
+          }
+        ]
+      },
+      {
+        "kind": "command",
+        "name": "pull",
+        "summary": "Fetch from and integrate with another repository or branch.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
         "priority": 89,
         "subcommands": [],
-        "flags": [],
+        "flags": [
+          {
+            "long": "rebase",
+            "short": null,
+            "aliases": [],
+            "summary": "Rebase the current branch on top of the upstream branch after fetching.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "ff-only",
+            "short": null,
+            "aliases": [],
+            "summary": "Only allow fast-forward updates.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          }
+        ],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "push",
+        "summary": "Update remote refs along with associated objects.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 88,
+        "subcommands": [],
+        "flags": [
+          {
+            "long": "force-with-lease",
+            "short": null,
+            "aliases": [],
+            "summary": "Allow a forced update only if the remote ref still matches the expected value.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "set-upstream",
+            "short": "u",
+            "aliases": [],
+            "summary": "Set upstream for the named branch.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "tags",
+            "short": null,
+            "aliases": [],
+            "summary": "Push all refs under refs/tags.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          }
+        ],
         "positional_args": []
       },
       {
@@ -195,8 +823,537 @@
         "aliases": [],
         "hidden": false,
         "deprecated": false,
-        "priority": 88,
+        "priority": 87,
         "subcommands": [],
+        "flags": [
+          {
+            "long": "interactive",
+            "short": "i",
+            "aliases": [],
+            "summary": "Make a list of the commits which are about to be rebased.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "continue",
+            "short": null,
+            "aliases": [],
+            "summary": "Restart the rebasing process after conflict resolution.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": true,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "abort",
+            "short": null,
+            "aliases": [],
+            "summary": "Abort the rebase operation and reset HEAD.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": true,
+            "conflicts_with": [],
+            "value": null
+          }
+        ],
+        "positional_args": [
+          {
+            "name": "upstream",
+            "summary": "Branch to rebase onto.",
+            "position": 0,
+            "required": false,
+            "repeatable": false,
+            "value": {
+              "slot_id": "git.rebase.upstream",
+              "source": {
+                "kind": "dynamic",
+                "enum_values": [],
+                "dynamic_source": {
+                  "lookup_class": "branch",
+                  "cache_policy": {
+                    "mode": "prefer_cache",
+                    "ttl_ms": 5000
+                  },
+                  "cost": "bounded_subprocess"
+                }
+              },
+              "quote_style": "backslash_escape"
+            }
+          }
+        ]
+      },
+      {
+        "kind": "command",
+        "name": "remote",
+        "summary": "Manage the set of tracked repositories.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 86,
+        "subcommands": [
+          {
+            "kind": "command",
+            "name": "add",
+            "summary": "Add a remote named <name> for the repository at <url>.",
+            "aliases": [],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 95,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": []
+          },
+          {
+            "kind": "command",
+            "name": "remove",
+            "summary": "Remove the remote named <name>.",
+            "aliases": [
+              "rm"
+            ],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 90,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": []
+          },
+          {
+            "kind": "command",
+            "name": "show",
+            "summary": "Give some information about the remote.",
+            "aliases": [],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 85,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": []
+          }
+        ],
+        "flags": [
+          {
+            "long": "verbose",
+            "short": "v",
+            "aliases": [],
+            "summary": "Be a little more verbose and show remote URL after name.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          }
+        ],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "reset",
+        "summary": "Reset current HEAD to the specified state.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 85,
+        "subcommands": [],
+        "flags": [
+          {
+            "long": "hard",
+            "short": null,
+            "aliases": [],
+            "summary": "Reset the index and working tree.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "soft",
+            "short": null,
+            "aliases": [],
+            "summary": "Reset only HEAD.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "mixed",
+            "short": null,
+            "aliases": [],
+            "summary": "Reset HEAD and the index.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          }
+        ],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "restore",
+        "summary": "Restore working tree files.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 84,
+        "subcommands": [],
+        "flags": [
+          {
+            "long": "staged",
+            "short": "S",
+            "aliases": [],
+            "summary": "Restore the index.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "source",
+            "short": "s",
+            "aliases": [],
+            "summary": "Restore from the given tree-ish.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": {
+              "slot_id": "git.restore.source",
+              "source": {
+                "kind": "free_text",
+                "enum_values": [],
+                "dynamic_source": null
+              },
+              "quote_style": "backslash_escape"
+            }
+          }
+        ],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "revert",
+        "summary": "Revert existing commits.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 83,
+        "subcommands": [],
+        "flags": [
+          {
+            "long": "no-commit",
+            "short": "n",
+            "aliases": [],
+            "summary": "Apply the changes without making a commit.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          }
+        ],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "show",
+        "summary": "Show various types of objects.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 82,
+        "subcommands": [],
+        "flags": [
+          {
+            "long": "stat",
+            "short": null,
+            "aliases": [],
+            "summary": "Show a diffstat.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "name-only",
+            "short": null,
+            "aliases": [],
+            "summary": "Show only names of changed files.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          }
+        ],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "stash",
+        "summary": "Stash the changes in a dirty working directory away.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 81,
+        "subcommands": [
+          {
+            "kind": "command",
+            "name": "push",
+            "summary": "Save your local modifications to a new stash entry.",
+            "aliases": [
+              "save"
+            ],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 95,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": []
+          },
+          {
+            "kind": "command",
+            "name": "pop",
+            "summary": "Remove a single stashed state from the stash list and apply it on top of the current working tree state.",
+            "aliases": [],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 90,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": []
+          },
+          {
+            "kind": "command",
+            "name": "apply",
+            "summary": "Apply a single stash entry on top of the current working tree state.",
+            "aliases": [],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 88,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": []
+          },
+          {
+            "kind": "command",
+            "name": "list",
+            "summary": "List the stash entries that you currently have.",
+            "aliases": [],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 85,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": []
+          }
+        ],
+        "flags": [],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "status",
+        "summary": "Show the working tree status.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 80,
+        "subcommands": [],
+        "flags": [
+          {
+            "long": "short",
+            "short": "s",
+            "aliases": [],
+            "summary": "Give the output in the short-format.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "branch",
+            "short": "b",
+            "aliases": [],
+            "summary": "Show the branch and tracking info even in short-format.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "porcelain",
+            "short": null,
+            "aliases": [],
+            "summary": "Give the output in an easy-to-parse format for scripts.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          }
+        ],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "tag",
+        "summary": "Create, list, delete or verify a tag object signed with GPG.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 79,
+        "subcommands": [],
+        "flags": [
+          {
+            "long": "annotate",
+            "short": "a",
+            "aliases": [],
+            "summary": "Make an unsigned, annotated tag object.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "delete",
+            "short": "d",
+            "aliases": [],
+            "summary": "Delete existing tags.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "list",
+            "short": "l",
+            "aliases": [],
+            "summary": "List tags with optional pattern matching.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          }
+        ],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "worktree",
+        "summary": "Manage multiple working trees attached to the same repository.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 78,
+        "subcommands": [
+          {
+            "kind": "command",
+            "name": "add",
+            "summary": "Create a worktree linked to the current repository.",
+            "aliases": [],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 95,
+            "subcommands": [],
+            "flags": [
+              {
+                "long": "detach",
+                "short": null,
+                "aliases": [],
+                "summary": "Detach HEAD in the new worktree.",
+                "hidden": false,
+                "deprecated": false,
+                "repeatable": false,
+                "terminal": false,
+                "conflicts_with": [],
+                "value": null
+              },
+              {
+                "long": "force",
+                "short": "f",
+                "aliases": [],
+                "summary": "Checkout <branch> even if already checked out in another worktree.",
+                "hidden": false,
+                "deprecated": false,
+                "repeatable": false,
+                "terminal": false,
+                "conflicts_with": [],
+                "value": null
+              }
+            ],
+            "positional_args": []
+          },
+          {
+            "kind": "command",
+            "name": "list",
+            "summary": "List details of each worktree.",
+            "aliases": [],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 90,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": []
+          },
+          {
+            "kind": "command",
+            "name": "remove",
+            "summary": "Remove a worktree.",
+            "aliases": [],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 85,
+            "subcommands": [],
+            "flags": [
+              {
+                "long": "force",
+                "short": "f",
+                "aliases": [],
+                "summary": "Remove even if dirty or locked.",
+                "hidden": false,
+                "deprecated": false,
+                "repeatable": false,
+                "terminal": false,
+                "conflicts_with": [],
+                "value": null
+              }
+            ],
+            "positional_args": []
+          }
+        ],
         "flags": [],
         "positional_args": []
       },
@@ -207,9 +1364,46 @@
         "aliases": [],
         "hidden": false,
         "deprecated": false,
-        "priority": 70,
+        "priority": 77,
         "subcommands": [],
-        "flags": [],
+        "flags": [
+          {
+            "long": "continue",
+            "short": null,
+            "aliases": [],
+            "summary": "Continue the operation in progress.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": true,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "abort",
+            "short": null,
+            "aliases": [],
+            "summary": "Cancel the operation and return to the pre-sequence state.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": true,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "no-commit",
+            "short": "n",
+            "aliases": [],
+            "summary": "Apply the changes without committing.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "terminal": false,
+            "conflicts_with": [],
+            "value": null
+          }
+        ],
         "positional_args": [
           {
             "name": "commit",
@@ -218,7 +1412,7 @@
             "required": true,
             "repeatable": false,
             "value": {
-              "slot_id": "cherry-pick.commit",
+              "slot_id": "git.cherry_pick.commit",
               "source": {
                 "kind": "free_text",
                 "enum_values": [],
@@ -252,6 +1446,102 @@
         "deprecated": false,
         "repeatable": false,
         "terminal": true,
+        "conflicts_with": [],
+        "value": null
+      },
+      {
+        "long": "git-dir",
+        "short": null,
+        "aliases": [],
+        "summary": "Set the path to the repository.",
+        "hidden": false,
+        "deprecated": false,
+        "repeatable": false,
+        "terminal": false,
+        "conflicts_with": [],
+        "value": {
+          "slot_id": "git.root.git_dir",
+          "source": {
+            "kind": "free_text",
+            "enum_values": [],
+            "dynamic_source": null
+          },
+          "quote_style": "backslash_escape"
+        }
+      },
+      {
+        "long": "work-tree",
+        "short": null,
+        "aliases": [],
+        "summary": "Set the path to the working tree.",
+        "hidden": false,
+        "deprecated": false,
+        "repeatable": false,
+        "terminal": false,
+        "conflicts_with": [],
+        "value": {
+          "slot_id": "git.root.work_tree",
+          "source": {
+            "kind": "free_text",
+            "enum_values": [],
+            "dynamic_source": null
+          },
+          "quote_style": "backslash_escape"
+        }
+      },
+      {
+        "long": "namespace",
+        "short": null,
+        "aliases": [],
+        "summary": "Set the Git namespace.",
+        "hidden": false,
+        "deprecated": false,
+        "repeatable": false,
+        "terminal": false,
+        "conflicts_with": [],
+        "value": {
+          "slot_id": "git.root.namespace",
+          "source": {
+            "kind": "free_text",
+            "enum_values": [],
+            "dynamic_source": null
+          },
+          "quote_style": "backslash_escape"
+        }
+      },
+      {
+        "long": "literal-pathspecs",
+        "short": null,
+        "aliases": [],
+        "summary": "Treat pathspecs literally.",
+        "hidden": false,
+        "deprecated": false,
+        "repeatable": false,
+        "terminal": false,
+        "conflicts_with": [],
+        "value": null
+      },
+      {
+        "long": "no-pager",
+        "short": null,
+        "aliases": [],
+        "summary": "Do not pipe Git output into a pager.",
+        "hidden": false,
+        "deprecated": false,
+        "repeatable": false,
+        "terminal": false,
+        "conflicts_with": [],
+        "value": null
+      },
+      {
+        "long": "paginate",
+        "short": "p",
+        "aliases": [],
+        "summary": "Pipe all output into less.",
+        "hidden": false,
+        "deprecated": false,
+        "repeatable": false,
+        "terminal": false,
         "conflicts_with": [],
         "value": null
       }

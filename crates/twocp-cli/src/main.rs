@@ -1,4 +1,5 @@
 mod builtins;
+mod git;
 mod kubectl;
 
 use std::collections::BTreeMap;

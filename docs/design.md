@@ -569,9 +569,9 @@ Chosen `zsh` interaction contract:
 - request suggestions on a short debounce during normal typing, not on every raw keystroke
 - request immediately on explicit movement into a new token boundary such as space-delimited subcommand progression
 - use arrow keys for dropdown movement when the menu is visible
-- use `Tab` to accept the highlighted suggestion
+- use `Enter` to accept the highlighted suggestion when the token is already narrowed or after explicit row movement
 - use `Esc` to dismiss the dropdown
-- use `Enter` to submit the shell buffer normally; it should not implicitly accept a suggestion first
+- use `Enter` to submit the shell buffer normally when no dropdown is visible
 - preserve access to native `zsh` completion on a separate explicit path instead of silently replacing it
 
 Recommended hook bias:
@@ -1013,7 +1013,7 @@ Deliverables:
 - debounced request path from `zsh` into the Rust binary
 - static `git` command and subcommand suggestions
 - bounded suggestion list with selection metadata and replacement ranges
-- acceptance flow using `Tab`, dismissal via `Esc`, and movement via arrow keys
+- acceptance flow using `Enter`, dismissal via `Esc`, and movement via arrow keys
 - explicit fallback path to native `zsh` completion
 - initial latency measurements for the warm static path
 

@@ -1,6 +1,6 @@
 {
   "provider_id": "builtin.kubectl",
-  "description": "Minimal built-in kubectl fixture for Phase 4 dynamic lookup validation.",
+  "description": "Curated built-in kubectl provider for common resource workflows and targeted dynamic lookup.",
   "capabilities": {
     "supports_static_commands": true,
     "supports_dynamic_values": true,
@@ -28,61 +28,541 @@
             "kind": "command",
             "name": "pods",
             "summary": "List pods.",
-            "aliases": ["po"],
+            "aliases": ["po", "pod"],
             "hidden": false,
             "deprecated": false,
-            "priority": 95,
+            "priority": 100,
             "subcommands": [],
             "flags": [],
-            "positional_args": []
+            "positional_args": [
+              {
+                "name": "name",
+                "summary": "Optional pod name.",
+                "position": 0,
+                "required": false,
+                "repeatable": false,
+                "value": {
+                  "slot_id": "kubectl.get.pods.name",
+                  "source": {
+                    "kind": "dynamic",
+                    "enum_values": [],
+                    "dynamic_source": {
+                      "lookup_class": "resource_name",
+                      "cache_policy": {
+                        "mode": "prefer_cache",
+                        "ttl_ms": 5000
+                      },
+                      "cost": "bounded_subprocess"
+                    }
+                  },
+                  "quote_style": "backslash_escape"
+                }
+              }
+            ]
           },
           {
             "kind": "command",
             "name": "deployments",
             "summary": "List deployments.",
-            "aliases": ["deploy"],
+            "aliases": ["deploy", "deployment"],
             "hidden": false,
             "deprecated": false,
-            "priority": 90,
+            "priority": 98,
             "subcommands": [],
             "flags": [],
-            "positional_args": []
+            "positional_args": [
+              {
+                "name": "name",
+                "summary": "Optional deployment name.",
+                "position": 0,
+                "required": false,
+                "repeatable": false,
+                "value": {
+                  "slot_id": "kubectl.get.deployments.name",
+                  "source": {
+                    "kind": "dynamic",
+                    "enum_values": [],
+                    "dynamic_source": {
+                      "lookup_class": "resource_name",
+                      "cache_policy": {
+                        "mode": "prefer_cache",
+                        "ttl_ms": 5000
+                      },
+                      "cost": "bounded_subprocess"
+                    }
+                  },
+                  "quote_style": "backslash_escape"
+                }
+              }
+            ]
+          },
+          {
+            "kind": "command",
+            "name": "replicasets",
+            "summary": "List replica sets.",
+            "aliases": ["rs", "replicaset"],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 96,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": [
+              {
+                "name": "name",
+                "summary": "Optional replica set name.",
+                "position": 0,
+                "required": false,
+                "repeatable": false,
+                "value": {
+                  "slot_id": "kubectl.get.replicasets.name",
+                  "source": {
+                    "kind": "dynamic",
+                    "enum_values": [],
+                    "dynamic_source": {
+                      "lookup_class": "resource_name",
+                      "cache_policy": {
+                        "mode": "prefer_cache",
+                        "ttl_ms": 5000
+                      },
+                      "cost": "bounded_subprocess"
+                    }
+                  },
+                  "quote_style": "backslash_escape"
+                }
+              }
+            ]
+          },
+          {
+            "kind": "command",
+            "name": "statefulsets",
+            "summary": "List stateful sets.",
+            "aliases": ["sts", "statefulset"],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 95,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": [
+              {
+                "name": "name",
+                "summary": "Optional stateful set name.",
+                "position": 0,
+                "required": false,
+                "repeatable": false,
+                "value": {
+                  "slot_id": "kubectl.get.statefulsets.name",
+                  "source": {
+                    "kind": "dynamic",
+                    "enum_values": [],
+                    "dynamic_source": {
+                      "lookup_class": "resource_name",
+                      "cache_policy": {
+                        "mode": "prefer_cache",
+                        "ttl_ms": 5000
+                      },
+                      "cost": "bounded_subprocess"
+                    }
+                  },
+                  "quote_style": "backslash_escape"
+                }
+              }
+            ]
+          },
+          {
+            "kind": "command",
+            "name": "daemonsets",
+            "summary": "List daemon sets.",
+            "aliases": ["ds", "daemonset"],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 94,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": [
+              {
+                "name": "name",
+                "summary": "Optional daemon set name.",
+                "position": 0,
+                "required": false,
+                "repeatable": false,
+                "value": {
+                  "slot_id": "kubectl.get.daemonsets.name",
+                  "source": {
+                    "kind": "dynamic",
+                    "enum_values": [],
+                    "dynamic_source": {
+                      "lookup_class": "resource_name",
+                      "cache_policy": {
+                        "mode": "prefer_cache",
+                        "ttl_ms": 5000
+                      },
+                      "cost": "bounded_subprocess"
+                    }
+                  },
+                  "quote_style": "backslash_escape"
+                }
+              }
+            ]
+          },
+          {
+            "kind": "command",
+            "name": "jobs",
+            "summary": "List jobs.",
+            "aliases": ["job"],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 93,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": [
+              {
+                "name": "name",
+                "summary": "Optional job name.",
+                "position": 0,
+                "required": false,
+                "repeatable": false,
+                "value": {
+                  "slot_id": "kubectl.get.jobs.name",
+                  "source": {
+                    "kind": "dynamic",
+                    "enum_values": [],
+                    "dynamic_source": {
+                      "lookup_class": "resource_name",
+                      "cache_policy": {
+                        "mode": "prefer_cache",
+                        "ttl_ms": 5000
+                      },
+                      "cost": "bounded_subprocess"
+                    }
+                  },
+                  "quote_style": "backslash_escape"
+                }
+              }
+            ]
+          },
+          {
+            "kind": "command",
+            "name": "cronjobs",
+            "summary": "List cron jobs.",
+            "aliases": ["cj", "cronjob"],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 92,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": [
+              {
+                "name": "name",
+                "summary": "Optional cron job name.",
+                "position": 0,
+                "required": false,
+                "repeatable": false,
+                "value": {
+                  "slot_id": "kubectl.get.cronjobs.name",
+                  "source": {
+                    "kind": "dynamic",
+                    "enum_values": [],
+                    "dynamic_source": {
+                      "lookup_class": "resource_name",
+                      "cache_policy": {
+                        "mode": "prefer_cache",
+                        "ttl_ms": 5000
+                      },
+                      "cost": "bounded_subprocess"
+                    }
+                  },
+                  "quote_style": "backslash_escape"
+                }
+              }
+            ]
           },
           {
             "kind": "command",
             "name": "services",
             "summary": "List services.",
-            "aliases": ["svc"],
+            "aliases": ["svc", "service"],
             "hidden": false,
             "deprecated": false,
-            "priority": 85,
+            "priority": 91,
             "subcommands": [],
             "flags": [],
-            "positional_args": []
+            "positional_args": [
+              {
+                "name": "name",
+                "summary": "Optional service name.",
+                "position": 0,
+                "required": false,
+                "repeatable": false,
+                "value": {
+                  "slot_id": "kubectl.get.services.name",
+                  "source": {
+                    "kind": "dynamic",
+                    "enum_values": [],
+                    "dynamic_source": {
+                      "lookup_class": "resource_name",
+                      "cache_policy": {
+                        "mode": "prefer_cache",
+                        "ttl_ms": 5000
+                      },
+                      "cost": "bounded_subprocess"
+                    }
+                  },
+                  "quote_style": "backslash_escape"
+                }
+              }
+            ]
           },
           {
             "kind": "command",
-            "name": "nodes",
-            "summary": "List nodes.",
-            "aliases": ["no"],
+            "name": "ingresses",
+            "summary": "List ingresses.",
+            "aliases": ["ing", "ingress"],
             "hidden": false,
             "deprecated": false,
-            "priority": 80,
+            "priority": 90,
             "subcommands": [],
             "flags": [],
-            "positional_args": []
+            "positional_args": [
+              {
+                "name": "name",
+                "summary": "Optional ingress name.",
+                "position": 0,
+                "required": false,
+                "repeatable": false,
+                "value": {
+                  "slot_id": "kubectl.get.ingresses.name",
+                  "source": {
+                    "kind": "dynamic",
+                    "enum_values": [],
+                    "dynamic_source": {
+                      "lookup_class": "resource_name",
+                      "cache_policy": {
+                        "mode": "prefer_cache",
+                        "ttl_ms": 5000
+                      },
+                      "cost": "bounded_subprocess"
+                    }
+                  },
+                  "quote_style": "backslash_escape"
+                }
+              }
+            ]
+          },
+          {
+            "kind": "command",
+            "name": "configmaps",
+            "summary": "List config maps.",
+            "aliases": ["cm", "configmap"],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 89,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": [
+              {
+                "name": "name",
+                "summary": "Optional config map name.",
+                "position": 0,
+                "required": false,
+                "repeatable": false,
+                "value": {
+                  "slot_id": "kubectl.get.configmaps.name",
+                  "source": {
+                    "kind": "dynamic",
+                    "enum_values": [],
+                    "dynamic_source": {
+                      "lookup_class": "resource_name",
+                      "cache_policy": {
+                        "mode": "prefer_cache",
+                        "ttl_ms": 5000
+                      },
+                      "cost": "bounded_subprocess"
+                    }
+                  },
+                  "quote_style": "backslash_escape"
+                }
+              }
+            ]
+          },
+          {
+            "kind": "command",
+            "name": "secrets",
+            "summary": "List secrets.",
+            "aliases": ["secret"],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 88,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": [
+              {
+                "name": "name",
+                "summary": "Optional secret name.",
+                "position": 0,
+                "required": false,
+                "repeatable": false,
+                "value": {
+                  "slot_id": "kubectl.get.secrets.name",
+                  "source": {
+                    "kind": "dynamic",
+                    "enum_values": [],
+                    "dynamic_source": {
+                      "lookup_class": "resource_name",
+                      "cache_policy": {
+                        "mode": "prefer_cache",
+                        "ttl_ms": 5000
+                      },
+                      "cost": "bounded_subprocess"
+                    }
+                  },
+                  "quote_style": "backslash_escape"
+                }
+              }
+            ]
           },
           {
             "kind": "command",
             "name": "namespaces",
             "summary": "List namespaces.",
-            "aliases": ["ns"],
+            "aliases": ["ns", "namespace"],
             "hidden": false,
             "deprecated": false,
-            "priority": 75,
+            "priority": 87,
             "subcommands": [],
             "flags": [],
-            "positional_args": []
+            "positional_args": [
+              {
+                "name": "name",
+                "summary": "Optional namespace name.",
+                "position": 0,
+                "required": false,
+                "repeatable": false,
+                "value": {
+                  "slot_id": "kubectl.get.namespaces.name",
+                  "source": {
+                    "kind": "dynamic",
+                    "enum_values": [],
+                    "dynamic_source": {
+                      "lookup_class": "resource_name",
+                      "cache_policy": {
+                        "mode": "prefer_cache",
+                        "ttl_ms": 5000
+                      },
+                      "cost": "bounded_subprocess"
+                    }
+                  },
+                  "quote_style": "backslash_escape"
+                }
+              }
+            ]
+          },
+          {
+            "kind": "command",
+            "name": "nodes",
+            "summary": "List nodes.",
+            "aliases": ["no", "node"],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 86,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": [
+              {
+                "name": "name",
+                "summary": "Optional node name.",
+                "position": 0,
+                "required": false,
+                "repeatable": false,
+                "value": {
+                  "slot_id": "kubectl.get.nodes.name",
+                  "source": {
+                    "kind": "dynamic",
+                    "enum_values": [],
+                    "dynamic_source": {
+                      "lookup_class": "resource_name",
+                      "cache_policy": {
+                        "mode": "prefer_cache",
+                        "ttl_ms": 5000
+                      },
+                      "cost": "bounded_subprocess"
+                    }
+                  },
+                  "quote_style": "backslash_escape"
+                }
+              }
+            ]
+          },
+          {
+            "kind": "command",
+            "name": "events",
+            "summary": "List events.",
+            "aliases": ["ev", "event"],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 85,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": [
+              {
+                "name": "name",
+                "summary": "Optional event name.",
+                "position": 0,
+                "required": false,
+                "repeatable": false,
+                "value": {
+                  "slot_id": "kubectl.get.events.name",
+                  "source": {
+                    "kind": "dynamic",
+                    "enum_values": [],
+                    "dynamic_source": {
+                      "lookup_class": "resource_name",
+                      "cache_policy": {
+                        "mode": "prefer_cache",
+                        "ttl_ms": 5000
+                      },
+                      "cost": "bounded_subprocess"
+                    }
+                  },
+                  "quote_style": "backslash_escape"
+                }
+              }
+            ]
+          },
+          {
+            "kind": "command",
+            "name": "persistentvolumeclaims",
+            "summary": "List persistent volume claims.",
+            "aliases": ["pvc"],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 84,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": [
+              {
+                "name": "name",
+                "summary": "Optional persistent volume claim name.",
+                "position": 0,
+                "required": false,
+                "repeatable": false,
+                "value": {
+                  "slot_id": "kubectl.get.persistentvolumeclaims.name",
+                  "source": {
+                    "kind": "dynamic",
+                    "enum_values": [],
+                    "dynamic_source": {
+                      "lookup_class": "resource_name",
+                      "cache_policy": {
+                        "mode": "prefer_cache",
+                        "ttl_ms": 5000
+                      },
+                      "cost": "bounded_subprocess"
+                    }
+                  },
+                  "quote_style": "backslash_escape"
+                }
+              }
+            ]
           }
         ],
         "flags": [
@@ -107,10 +587,29 @@
             "repeatable": false,
             "conflicts_with": [],
             "value": {
-              "slot_id": "get.output",
+              "slot_id": "kubectl.get.output",
               "source": {
                 "kind": "enum",
-                "enum_values": ["json", "yaml", "wide", "name"],
+                "enum_values": ["json", "yaml", "wide", "name", "custom-columns"],
+                "dynamic_source": null
+              },
+              "quote_style": "backslash_escape"
+            }
+          },
+          {
+            "long": "selector",
+            "short": "l",
+            "aliases": [],
+            "summary": "Selector to filter on.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "conflicts_with": [],
+            "value": {
+              "slot_id": "kubectl.get.selector",
+              "source": {
+                "kind": "free_text",
+                "enum_values": [],
                 "dynamic_source": null
               },
               "quote_style": "backslash_escape"
@@ -122,11 +621,11 @@
       {
         "kind": "command",
         "name": "describe",
-        "summary": "Show details of a resource.",
+        "summary": "Show details of a specific resource or group of resources.",
         "aliases": [],
         "hidden": false,
         "deprecated": false,
-        "priority": 95,
+        "priority": 99,
         "subcommands": [
           {
             "kind": "command",
@@ -135,7 +634,7 @@
             "aliases": ["po", "pod"],
             "hidden": false,
             "deprecated": false,
-            "priority": 95,
+            "priority": 100,
             "subcommands": [],
             "flags": [],
             "positional_args": [
@@ -146,7 +645,7 @@
                 "required": false,
                 "repeatable": false,
                 "value": {
-                  "slot_id": "kubectl.describe.pod.name",
+                  "slot_id": "kubectl.describe.pods.name",
                   "source": {
                     "kind": "dynamic",
                     "enum_values": [],
@@ -168,13 +667,73 @@
             "kind": "command",
             "name": "deployments",
             "summary": "Describe a deployment.",
-            "aliases": ["deploy"],
+            "aliases": ["deploy", "deployment"],
             "hidden": false,
             "deprecated": false,
-            "priority": 85,
+            "priority": 98,
             "subcommands": [],
             "flags": [],
-            "positional_args": []
+            "positional_args": [
+              {
+                "name": "name",
+                "summary": "Deployment name.",
+                "position": 0,
+                "required": false,
+                "repeatable": false,
+                "value": {
+                  "slot_id": "kubectl.describe.deployments.name",
+                  "source": {
+                    "kind": "dynamic",
+                    "enum_values": [],
+                    "dynamic_source": {
+                      "lookup_class": "resource_name",
+                      "cache_policy": {
+                        "mode": "prefer_cache",
+                        "ttl_ms": 5000
+                      },
+                      "cost": "bounded_subprocess"
+                    }
+                  },
+                  "quote_style": "backslash_escape"
+                }
+              }
+            ]
+          },
+          {
+            "kind": "command",
+            "name": "services",
+            "summary": "Describe a service.",
+            "aliases": ["svc", "service"],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 96,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": [
+              {
+                "name": "name",
+                "summary": "Service name.",
+                "position": 0,
+                "required": false,
+                "repeatable": false,
+                "value": {
+                  "slot_id": "kubectl.describe.services.name",
+                  "source": {
+                    "kind": "dynamic",
+                    "enum_values": [],
+                    "dynamic_source": {
+                      "lookup_class": "resource_name",
+                      "cache_policy": {
+                        "mode": "prefer_cache",
+                        "ttl_ms": 5000
+                      },
+                      "cost": "bounded_subprocess"
+                    }
+                  },
+                  "quote_style": "backslash_escape"
+                }
+              }
+            ]
           }
         ],
         "flags": [],
@@ -182,51 +741,154 @@
       },
       {
         "kind": "command",
-        "name": "config",
-        "summary": "Modify kubeconfig files.",
+        "name": "delete",
+        "summary": "Delete resources by file names, stdin, resources and names, or by resources and label selector.",
         "aliases": [],
         "hidden": false,
         "deprecated": false,
-        "priority": 90,
+        "priority": 98,
         "subcommands": [
           {
             "kind": "command",
-            "name": "use-context",
-            "summary": "Set the current context.",
-            "aliases": [],
+            "name": "pods",
+            "summary": "Delete a pod.",
+            "aliases": ["po", "pod"],
             "hidden": false,
             "deprecated": false,
-            "priority": 95,
+            "priority": 100,
             "subcommands": [],
             "flags": [],
-            "positional_args": []
+            "positional_args": [
+              {
+                "name": "name",
+                "summary": "Pod name.",
+                "position": 0,
+                "required": false,
+                "repeatable": false,
+                "value": {
+                  "slot_id": "kubectl.delete.pods.name",
+                  "source": {
+                    "kind": "dynamic",
+                    "enum_values": [],
+                    "dynamic_source": {
+                      "lookup_class": "resource_name",
+                      "cache_policy": {
+                        "mode": "prefer_cache",
+                        "ttl_ms": 5000
+                      },
+                      "cost": "bounded_subprocess"
+                    }
+                  },
+                  "quote_style": "backslash_escape"
+                }
+              }
+            ]
           },
           {
             "kind": "command",
-            "name": "set-context",
-            "summary": "Set a context entry in kubeconfig.",
-            "aliases": [],
+            "name": "deployments",
+            "summary": "Delete a deployment.",
+            "aliases": ["deploy", "deployment"],
             "hidden": false,
             "deprecated": false,
-            "priority": 85,
+            "priority": 98,
             "subcommands": [],
             "flags": [],
-            "positional_args": []
+            "positional_args": [
+              {
+                "name": "name",
+                "summary": "Deployment name.",
+                "position": 0,
+                "required": false,
+                "repeatable": false,
+                "value": {
+                  "slot_id": "kubectl.delete.deployments.name",
+                  "source": {
+                    "kind": "dynamic",
+                    "enum_values": [],
+                    "dynamic_source": {
+                      "lookup_class": "resource_name",
+                      "cache_policy": {
+                        "mode": "prefer_cache",
+                        "ttl_ms": 5000
+                      },
+                      "cost": "bounded_subprocess"
+                    }
+                  },
+                  "quote_style": "backslash_escape"
+                }
+              }
+            ]
           },
           {
             "kind": "command",
-            "name": "current-context",
-            "summary": "Display the current context.",
-            "aliases": [],
+            "name": "services",
+            "summary": "Delete a service.",
+            "aliases": ["svc", "service"],
             "hidden": false,
             "deprecated": false,
-            "priority": 80,
+            "priority": 96,
             "subcommands": [],
             "flags": [],
-            "positional_args": []
+            "positional_args": [
+              {
+                "name": "name",
+                "summary": "Service name.",
+                "position": 0,
+                "required": false,
+                "repeatable": false,
+                "value": {
+                  "slot_id": "kubectl.delete.services.name",
+                  "source": {
+                    "kind": "dynamic",
+                    "enum_values": [],
+                    "dynamic_source": {
+                      "lookup_class": "resource_name",
+                      "cache_policy": {
+                        "mode": "prefer_cache",
+                        "ttl_ms": 5000
+                      },
+                      "cost": "bounded_subprocess"
+                    }
+                  },
+                  "quote_style": "backslash_escape"
+                }
+              }
+            ]
           }
         ],
-        "flags": [],
+        "flags": [
+          {
+            "long": "force",
+            "short": null,
+            "aliases": [],
+            "summary": "Immediately remove resources from API and bypass graceful deletion.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "grace-period",
+            "short": null,
+            "aliases": [],
+            "summary": "Period of time in seconds given to the resource to terminate gracefully.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "conflicts_with": [],
+            "value": {
+              "slot_id": "kubectl.delete.grace_period",
+              "source": {
+                "kind": "free_text",
+                "enum_values": [],
+                "dynamic_source": null
+              },
+              "quote_style": "backslash_escape"
+            }
+          }
+        ],
         "positional_args": []
       },
       {
@@ -236,7 +898,7 @@
         "aliases": [],
         "hidden": false,
         "deprecated": false,
-        "priority": 88,
+        "priority": 97,
         "subcommands": [],
         "flags": [
           {
@@ -249,6 +911,25 @@
             "repeatable": false,
             "conflicts_with": [],
             "value": null
+          },
+          {
+            "long": "container",
+            "short": "c",
+            "aliases": [],
+            "summary": "Print the logs of this container.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "conflicts_with": [],
+            "value": {
+              "slot_id": "kubectl.logs.container",
+              "source": {
+                "kind": "free_text",
+                "enum_values": [],
+                "dynamic_source": null
+              },
+              "quote_style": "backslash_escape"
+            }
           }
         ],
         "positional_args": [
@@ -279,22 +960,297 @@
       },
       {
         "kind": "command",
+        "name": "exec",
+        "summary": "Execute a command in a container.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 96,
+        "subcommands": [],
+        "flags": [
+          {
+            "long": "stdin",
+            "short": "i",
+            "aliases": [],
+            "summary": "Pass stdin to the container.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "tty",
+            "short": "t",
+            "aliases": [],
+            "summary": "Stdin is a TTY.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "conflicts_with": [],
+            "value": null
+          },
+          {
+            "long": "container",
+            "short": "c",
+            "aliases": [],
+            "summary": "Container name.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "conflicts_with": [],
+            "value": {
+              "slot_id": "kubectl.exec.container",
+              "source": {
+                "kind": "free_text",
+                "enum_values": [],
+                "dynamic_source": null
+              },
+              "quote_style": "backslash_escape"
+            }
+          }
+        ],
+        "positional_args": [
+          {
+            "name": "pod",
+            "summary": "Pod to execute into.",
+            "position": 0,
+            "required": false,
+            "repeatable": false,
+            "value": {
+              "slot_id": "kubectl.exec.pod.name",
+              "source": {
+                "kind": "dynamic",
+                "enum_values": [],
+                "dynamic_source": {
+                  "lookup_class": "resource_name",
+                  "cache_policy": {
+                    "mode": "prefer_cache",
+                    "ttl_ms": 5000
+                  },
+                  "cost": "bounded_subprocess"
+                }
+              },
+              "quote_style": "backslash_escape"
+            }
+          }
+        ]
+      },
+      {
+        "kind": "command",
+        "name": "apply",
+        "summary": "Apply a configuration to a resource by file name or stdin.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 95,
+        "subcommands": [],
+        "flags": [
+          {
+            "long": "filename",
+            "short": "f",
+            "aliases": [],
+            "summary": "Filename, directory, or URL to files to use to create the resource.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": true,
+            "conflicts_with": [],
+            "value": {
+              "slot_id": "kubectl.apply.filename",
+              "source": {
+                "kind": "free_text",
+                "enum_values": [],
+                "dynamic_source": null
+              },
+              "quote_style": "backslash_escape"
+            }
+          },
+          {
+            "long": "server-side",
+            "short": null,
+            "aliases": [],
+            "summary": "If true, apply runs in the server instead of the client.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "conflicts_with": [],
+            "value": null
+          }
+        ],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "create",
+        "summary": "Create a resource from a file or from stdin.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 94,
+        "subcommands": [],
+        "flags": [
+          {
+            "long": "filename",
+            "short": "f",
+            "aliases": [],
+            "summary": "Filename, directory, or URL to files to use to create the resource.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": true,
+            "conflicts_with": [],
+            "value": {
+              "slot_id": "kubectl.create.filename",
+              "source": {
+                "kind": "free_text",
+                "enum_values": [],
+                "dynamic_source": null
+              },
+              "quote_style": "backslash_escape"
+            }
+          }
+        ],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "config",
+        "summary": "Modify kubeconfig files.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 93,
+        "subcommands": [
+          {
+            "kind": "command",
+            "name": "use-context",
+            "summary": "Set the current context in a kubeconfig file.",
+            "aliases": [],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 100,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": [
+              {
+                "name": "context",
+                "summary": "Context name.",
+                "position": 0,
+                "required": false,
+                "repeatable": false,
+                "value": {
+                  "slot_id": "kubectl.config.use_context.name",
+                  "source": {
+                    "kind": "dynamic",
+                    "enum_values": [],
+                    "dynamic_source": {
+                      "lookup_class": "context",
+                      "cache_policy": {
+                        "mode": "prefer_cache",
+                        "ttl_ms": 5000
+                      },
+                      "cost": "bounded_subprocess"
+                    }
+                  },
+                  "quote_style": "backslash_escape"
+                }
+              }
+            ]
+          },
+          {
+            "kind": "command",
+            "name": "set-context",
+            "summary": "Set a context entry in kubeconfig.",
+            "aliases": [],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 98,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": []
+          },
+          {
+            "kind": "command",
+            "name": "current-context",
+            "summary": "Display the current context.",
+            "aliases": [],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 96,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": []
+          },
+          {
+            "kind": "command",
+            "name": "get-contexts",
+            "summary": "Describe one or many contexts.",
+            "aliases": [],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 94,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": []
+          }
+        ],
+        "flags": [],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
         "name": "rollout",
         "summary": "Manage the rollout of a resource.",
         "aliases": [],
         "hidden": false,
         "deprecated": false,
-        "priority": 82,
+        "priority": 92,
         "subcommands": [
           {
             "kind": "command",
             "name": "status",
-            "summary": "Show rollout status.",
+            "summary": "Show the status of the rollout.",
             "aliases": [],
             "hidden": false,
             "deprecated": false,
-            "priority": 90,
-            "subcommands": [],
+            "priority": 100,
+            "subcommands": [
+              {
+                "kind": "command",
+                "name": "deployments",
+                "summary": "Show rollout status for a deployment.",
+                "aliases": ["deploy", "deployment"],
+                "hidden": false,
+                "deprecated": false,
+                "priority": 100,
+                "subcommands": [],
+                "flags": [],
+                "positional_args": [
+                  {
+                    "name": "name",
+                    "summary": "Deployment name.",
+                    "position": 0,
+                    "required": false,
+                    "repeatable": false,
+                    "value": {
+                      "slot_id": "kubectl.rollout.status.deployments.name",
+                      "source": {
+                        "kind": "dynamic",
+                        "enum_values": [],
+                        "dynamic_source": {
+                          "lookup_class": "resource_name",
+                          "cache_policy": {
+                            "mode": "prefer_cache",
+                            "ttl_ms": 5000
+                          },
+                          "cost": "bounded_subprocess"
+                        }
+                      },
+                      "quote_style": "backslash_escape"
+                    }
+                  }
+                ]
+              }
+            ],
             "flags": [],
             "positional_args": []
           },
@@ -305,13 +1261,382 @@
             "aliases": [],
             "hidden": false,
             "deprecated": false,
-            "priority": 88,
+            "priority": 98,
+            "subcommands": [
+              {
+                "kind": "command",
+                "name": "deployments",
+                "summary": "Restart a deployment.",
+                "aliases": ["deploy", "deployment"],
+                "hidden": false,
+                "deprecated": false,
+                "priority": 100,
+                "subcommands": [],
+                "flags": [],
+                "positional_args": [
+                  {
+                    "name": "name",
+                    "summary": "Deployment name.",
+                    "position": 0,
+                    "required": false,
+                    "repeatable": false,
+                    "value": {
+                      "slot_id": "kubectl.rollout.restart.deployments.name",
+                      "source": {
+                        "kind": "dynamic",
+                        "enum_values": [],
+                        "dynamic_source": {
+                          "lookup_class": "resource_name",
+                          "cache_policy": {
+                            "mode": "prefer_cache",
+                            "ttl_ms": 5000
+                          },
+                          "cost": "bounded_subprocess"
+                        }
+                      },
+                      "quote_style": "backslash_escape"
+                    }
+                  }
+                ]
+              }
+            ],
+            "flags": [],
+            "positional_args": []
+          }
+        ],
+        "flags": [],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "set",
+        "summary": "Set specific features on objects.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 91,
+        "subcommands": [
+          {
+            "kind": "command",
+            "name": "image",
+            "summary": "Update image of a pod template.",
+            "aliases": [],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 100,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": []
+          },
+          {
+            "kind": "command",
+            "name": "env",
+            "summary": "Update environment variables on a pod template.",
+            "aliases": [],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 98,
             "subcommands": [],
             "flags": [],
             "positional_args": []
           }
         ],
         "flags": [],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "edit",
+        "summary": "Edit a resource on the server.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 90,
+        "subcommands": [
+          {
+            "kind": "command",
+            "name": "deployments",
+            "summary": "Edit a deployment.",
+            "aliases": ["deploy", "deployment"],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 100,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": [
+              {
+                "name": "name",
+                "summary": "Deployment name.",
+                "position": 0,
+                "required": false,
+                "repeatable": false,
+                "value": {
+                  "slot_id": "kubectl.edit.deployments.name",
+                  "source": {
+                    "kind": "dynamic",
+                    "enum_values": [],
+                    "dynamic_source": {
+                      "lookup_class": "resource_name",
+                      "cache_policy": {
+                        "mode": "prefer_cache",
+                        "ttl_ms": 5000
+                      },
+                      "cost": "bounded_subprocess"
+                    }
+                  },
+                  "quote_style": "backslash_escape"
+                }
+              }
+            ]
+          }
+        ],
+        "flags": [],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "port-forward",
+        "summary": "Forward one or more local ports to a pod.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 89,
+        "subcommands": [],
+        "flags": [
+          {
+            "long": "address",
+            "short": null,
+            "aliases": [],
+            "summary": "Addresses to listen on.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "conflicts_with": [],
+            "value": {
+              "slot_id": "kubectl.port_forward.address",
+              "source": {
+                "kind": "free_text",
+                "enum_values": [],
+                "dynamic_source": null
+              },
+              "quote_style": "backslash_escape"
+            }
+          }
+        ],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "cp",
+        "summary": "Copy files and directories to and from containers.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 88,
+        "subcommands": [],
+        "flags": [],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "top",
+        "summary": "Display resource usage (CPU and memory).",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 87,
+        "subcommands": [
+          {
+            "kind": "command",
+            "name": "pods",
+            "summary": "Show metrics for pods.",
+            "aliases": ["po", "pod"],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 100,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": [
+              {
+                "name": "name",
+                "summary": "Optional pod name.",
+                "position": 0,
+                "required": false,
+                "repeatable": false,
+                "value": {
+                  "slot_id": "kubectl.top.pods.name",
+                  "source": {
+                    "kind": "dynamic",
+                    "enum_values": [],
+                    "dynamic_source": {
+                      "lookup_class": "resource_name",
+                      "cache_policy": {
+                        "mode": "prefer_cache",
+                        "ttl_ms": 5000
+                      },
+                      "cost": "bounded_subprocess"
+                    }
+                  },
+                  "quote_style": "backslash_escape"
+                }
+              }
+            ]
+          },
+          {
+            "kind": "command",
+            "name": "nodes",
+            "summary": "Show metrics for nodes.",
+            "aliases": ["no", "node"],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 98,
+            "subcommands": [],
+            "flags": [],
+            "positional_args": [
+              {
+                "name": "name",
+                "summary": "Optional node name.",
+                "position": 0,
+                "required": false,
+                "repeatable": false,
+                "value": {
+                  "slot_id": "kubectl.top.nodes.name",
+                  "source": {
+                    "kind": "dynamic",
+                    "enum_values": [],
+                    "dynamic_source": {
+                      "lookup_class": "resource_name",
+                      "cache_policy": {
+                        "mode": "prefer_cache",
+                        "ttl_ms": 5000
+                      },
+                      "cost": "bounded_subprocess"
+                    }
+                  },
+                  "quote_style": "backslash_escape"
+                }
+              }
+            ]
+          }
+        ],
+        "flags": [],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "scale",
+        "summary": "Set a new size for a deployment, replica set, or stateful set.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 86,
+        "subcommands": [
+          {
+            "kind": "command",
+            "name": "deployments",
+            "summary": "Scale a deployment.",
+            "aliases": ["deploy", "deployment"],
+            "hidden": false,
+            "deprecated": false,
+            "priority": 100,
+            "subcommands": [],
+            "flags": [
+              {
+                "long": "replicas",
+                "short": null,
+                "aliases": [],
+                "summary": "The new desired number of replicas.",
+                "hidden": false,
+                "deprecated": false,
+                "repeatable": false,
+                "conflicts_with": [],
+                "value": {
+                  "slot_id": "kubectl.scale.replicas",
+                  "source": {
+                    "kind": "free_text",
+                    "enum_values": [],
+                    "dynamic_source": null
+                  },
+                  "quote_style": "backslash_escape"
+                }
+              }
+            ],
+            "positional_args": [
+              {
+                "name": "name",
+                "summary": "Deployment name.",
+                "position": 0,
+                "required": false,
+                "repeatable": false,
+                "value": {
+                  "slot_id": "kubectl.scale.deployments.name",
+                  "source": {
+                    "kind": "dynamic",
+                    "enum_values": [],
+                    "dynamic_source": {
+                      "lookup_class": "resource_name",
+                      "cache_policy": {
+                        "mode": "prefer_cache",
+                        "ttl_ms": 5000
+                      },
+                      "cost": "bounded_subprocess"
+                    }
+                  },
+                  "quote_style": "backslash_escape"
+                }
+              }
+            ]
+          }
+        ],
+        "flags": [],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "annotate",
+        "summary": "Update the annotations on a resource.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 85,
+        "subcommands": [],
+        "flags": [
+          {
+            "long": "overwrite",
+            "short": null,
+            "aliases": [],
+            "summary": "Allow annotations to be overwritten.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "conflicts_with": [],
+            "value": null
+          }
+        ],
+        "positional_args": []
+      },
+      {
+        "kind": "command",
+        "name": "label",
+        "summary": "Update the labels on a resource.",
+        "aliases": [],
+        "hidden": false,
+        "deprecated": false,
+        "priority": 84,
+        "subcommands": [],
+        "flags": [
+          {
+            "long": "overwrite",
+            "short": null,
+            "aliases": [],
+            "summary": "Allow labels to be overwritten.",
+            "hidden": false,
+            "deprecated": false,
+            "repeatable": false,
+            "conflicts_with": [],
+            "value": null
+          }
+        ],
         "positional_args": []
       }
     ],
@@ -326,11 +1651,18 @@
         "repeatable": false,
         "conflicts_with": [],
         "value": {
-          "slot_id": "root.namespace",
+          "slot_id": "kubectl.root.namespace",
           "source": {
-            "kind": "free_text",
+            "kind": "dynamic",
             "enum_values": [],
-            "dynamic_source": null
+            "dynamic_source": {
+              "lookup_class": "namespace",
+              "cache_policy": {
+                "mode": "prefer_cache",
+                "ttl_ms": 5000
+              },
+              "cost": "bounded_subprocess"
+            }
           },
           "quote_style": "backslash_escape"
         }
@@ -345,11 +1677,18 @@
         "repeatable": false,
         "conflicts_with": [],
         "value": {
-          "slot_id": "root.context",
+          "slot_id": "kubectl.root.context",
           "source": {
-            "kind": "free_text",
+            "kind": "dynamic",
             "enum_values": [],
-            "dynamic_source": null
+            "dynamic_source": {
+              "lookup_class": "context",
+              "cache_policy": {
+                "mode": "prefer_cache",
+                "ttl_ms": 5000
+              },
+              "cost": "bounded_subprocess"
+            }
           },
           "quote_style": "backslash_escape"
         }
@@ -364,7 +1703,7 @@
         "repeatable": false,
         "conflicts_with": [],
         "value": {
-          "slot_id": "root.kubeconfig",
+          "slot_id": "kubectl.root.kubeconfig",
           "source": {
             "kind": "free_text",
             "enum_values": [],
@@ -383,6 +1722,25 @@
         "repeatable": false,
         "conflicts_with": [],
         "value": null
+      },
+      {
+        "long": "output",
+        "short": "o",
+        "aliases": [],
+        "summary": "Output format.",
+        "hidden": false,
+        "deprecated": false,
+        "repeatable": false,
+        "conflicts_with": [],
+        "value": {
+          "slot_id": "kubectl.root.output",
+          "source": {
+            "kind": "enum",
+            "enum_values": ["json", "yaml", "wide", "name"],
+            "dynamic_source": null
+          },
+          "quote_style": "backslash_escape"
+        }
       }
     ],
     "positional_args": []

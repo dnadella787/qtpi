@@ -341,7 +341,8 @@ impl Provider for ArtifactProvider {
             .filter(|flag| !flag.hidden)
             .filter(|flag| flag.repeatable || !scope.used_flags.contains(&flag.long))
             .filter(|flag| {
-                !flag.conflicts_with
+                !flag
+                    .conflicts_with
                     .iter()
                     .any(|conflict| scope.used_flags.contains(conflict))
             })

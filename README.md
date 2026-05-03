@@ -6,15 +6,16 @@ The immediate target is a local installable tool that helps users discover and c
 
 ## Current Status
 
-Phase 4 is implemented as a multi-CLI built-in prototype with the first interactive `zsh` path and the first bounded dynamic lookup. The workspace now includes the Phase 1 Rust-side foundation, a suggestion engine for built-in `git` and `kubectl`, a shell-facing `twocp suggest` command, a thin `zsh` bridge that renders suggestions below the prompt with shell-owned state, and a live `kubectl` pod-name lookup path with explicit cache and degraded-mode behavior.
+Phase 4 is implemented as a multi-CLI built-in prototype with the first interactive `zsh` path and targeted bounded dynamic lookup. The workspace now includes the Phase 1 Rust-side foundation, a suggestion engine for built-in `git` and `kubectl`, a shell-facing `twocp suggest` command, a thin `zsh` bridge with a zsh-owned 5-row overlay renderer driven by shell-managed selection state, and live provider-owned lookup paths for git branches plus high-value kubectl resource names, namespaces, and contexts with explicit cache and degraded-mode behavior.
 
 The current interactive path remains intentionally narrow:
 
 - `zsh` only
-- built-in `git` and `kubectl` fixtures
-- static command and subcommand suggestions
+- built-in curated `git` and `kubectl` command trees
+- static command, subcommand, and common flag suggestions
 - enum-backed value suggestions such as `kubectl get --output `
-- dynamic pod-name lookup for `kubectl describe pod <name>` and `kubectl logs <pod>`
+- dynamic git branch lookup for `git checkout <target>`, `git switch <branch>`, `git merge <branch>`, and `git rebase <upstream>`
+- dynamic kubectl lookup for common resource names, `--namespace`, `--context`, and `kubectl config use-context <context>`
 - explicit 2cp keybindings that leave native completion unchanged
 
 External plugin runtime loading and additional CLIs remain future work. Dynamic lookup is intentionally narrow in the current build and only covers the first `kubectl` pod-name slot.
@@ -46,6 +47,7 @@ cargo fmt --all
 cargo check --workspace
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
+zsh shell/zsh/twocp_state_test.zsh
 ```
 
 ## Next Development Step
@@ -64,30 +66,48 @@ source "$PWD/shell/zsh/twocp.zsh"
 
 Current interaction:
 
-- type `git ` to auto-show built-in static suggestions
+- type `git ` to auto-show the expanded built-in git command set
 - keep typing after `git `, such as `git ch`, to narrow to `checkout` and `cherry-pick`
-- after later spaces under a supported root, such as `git commit `, the menu reopens for the next flags or values
+- after later spaces under a supported root, such as `git checkout ` or `git commit `, the menu reopens for the next flags or values
 - type `kubectl ` or `k ` to auto-show the built-in kubectl command tree
 - keep typing after `kubectl `, such as `kubectl get po`, to narrow to `pods`
-- after later spaces under kubectl, such as `kubectl get `, the menu reopens for the next resources or flags
-- type `kubectl describe pod `, then press `Ctrl-X 2 s` to trigger bounded live pod-name lookup
-- the selected row is rendered with an inverted highlight
-- `Down` / `Up` move the selection while the 2cp menu is visible, and otherwise keep their original shell behavior
-- `Ctrl-X 2 j` / `Ctrl-X 2 k` also move the selection while the 2cp menu is visible
-- `Enter` accepts the highlighted 2cp suggestion while the menu is visible, and otherwise keeps normal shell Enter behavior
-- `Ctrl-X 2 a` accepts the highlighted 2cp suggestion
-- `Ctrl-X 2 d` dismisses the 2cp menu
+- after later spaces under kubectl, such as `kubectl get ` or `kubectl get pods `, the menu reopens for the next resources, names, or flags
+- type `kubectl describe pod `, `kubectl get pods `, or `kubectl config use-context `, then press `Ctrl-X 2 s` to trigger bounded live lookup for names or contexts
+- the menu is painted by `zsh` as a terminal overlay below the prompt instead of using `complist`, `menu-select`, or Rust-owned terminal drawing
+- the visible window is fixed at 5 rows; if more than 5 candidates exist, the window scrolls only after the highlighted row leaves the visible slice
+- the first ranked row is highlighted immediately on show and after typed refreshes
+- `Down` / `Up` move the highlighted row one item at a time while the menu is visible, clamp at the ends, and otherwise keep their original shell behavior
+- typing or backspacing while the menu is visible refreshes suggestions, resets the highlight to the first ranked row, and repaints the overlay in place
+- `Enter` accepts the highlighted suggestion when the current token is narrowed or after explicit row movement; for auto-opened empty-fragment menus it keeps normal shell Enter behavior
+- `Esc` dismisses the current suggestion list while it is visible
+- `Ctrl-C` dismisses the current suggestion list and then falls through to native shell interrupt behavior
 - `Tab` and normal `zsh` completion remain owned by the user's existing shell setup
 
-The dropdown shows at most 5 rows by default while keeping a larger candidate
-set loaded for scrolling. Override visible rows with `TWOCP_MAX_ROWS` and the
-candidate cap with `TWOCP_MAX_SUGGESTIONS`.
+The candidate set remains bounded by `TWOCP_MAX_SUGGESTIONS`. The prototype
+dropdown intentionally renders exactly 5 visible rows and does not expose a row
+count override. If the terminal cannot safely support cursor-addressed overlay
+painting, 2cp disables the dropdown for that session instead of falling back to
+`complist`.
 
 Auto-show roots default to `git`, `kubectl`, and `k`. Override them before
 sourcing the bridge with `TWOCP_AUTO_ROOTS`.
 
 The default 2cp keybindings can be overridden before sourcing the bridge with
-`TWOCP_KEY_SHOW`, `TWOCP_KEY_ACCEPT`, `TWOCP_KEY_DISMISS`, `TWOCP_KEY_NEXT`, and
-`TWOCP_KEY_PREVIOUS` using `bindkey` notation. `Enter` defaults to both `^M`
+`TWOCP_KEY_SHOW` using `bindkey` notation. `Enter` defaults to both `^M`
 and `^J`, and can be overridden with `TWOCP_KEY_ENTER` and
-`TWOCP_KEY_ENTER_ALT`.
+`TWOCP_KEY_ENTER_ALT`. `Esc` defaults to `^[` and can be overridden with
+`TWOCP_KEY_ESCAPE`. `Ctrl-C` defaults to `^C` and can be overridden with
+`TWOCP_KEY_INTERRUPT`.
+
+The repo-local shell regression harness lives at `shell/zsh/twocp_state_test.zsh`.
+It exercises show and typed-refresh state, scroll-window movement, clamping, and
+clean invalidation directly against the internal zsh helpers. It does not try to
+assert terminal cursor painting.
+
+Manual terminal verification for the current overlay contract should record:
+
+- the terminal emulator and `TERM` value used
+- whether the highlight path used standout, reverse-video, or marker fallback
+- that `git `, `git c`, `git co`, and `git com` narrow in place while keeping the menu visible when matches remain
+- that moving down past row 5 scrolls the frame and moving up from the bottom keeps the highlight inside the frame before the frame scrolls upward
+- that `Enter`, `Esc`, `Ctrl-C`, prompt redraw, and command submission clear the overlay cleanly

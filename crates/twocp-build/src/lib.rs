@@ -166,25 +166,33 @@ mod tests {
 
     use super::*;
 
-    fn fixture_json() -> &'static [u8] {
+    fn git_fixture_json() -> &'static [u8] {
         include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../providers-src/git-minimal.json"
         ))
     }
 
+    fn kubectl_fixture_json() -> &'static [u8] {
+        include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../providers-src/kubectl-minimal.json"
+        ))
+    }
+
     #[test]
     fn provider_artifacts_compile_deterministically_from_json() {
-        let first = compile_json_bytes(fixture_json()).expect("first compile should pass");
-        let second = compile_json_bytes(fixture_json()).expect("second compile should pass");
-        assert_eq!(first, second);
+        for (provider_id, fixture) in [
+            (ProviderId::from("builtin.git"), git_fixture_json()),
+            (ProviderId::from("builtin.kubectl"), kubectl_fixture_json()),
+        ] {
+            let first = compile_json_bytes(fixture).expect("first compile should pass");
+            let second = compile_json_bytes(fixture).expect("second compile should pass");
+            assert_eq!(first, second);
 
-        let artifact = decode_artifact(&first).expect("artifact should decode");
-        assert_eq!(
-            artifact.provider.provider_id,
-            ProviderId::from("builtin.git")
-        );
-        assert_eq!(artifact.root.name, "git");
+            let artifact = decode_artifact(&first).expect("artifact should decode");
+            assert_eq!(artifact.provider.provider_id, provider_id);
+        }
     }
 
     #[test]
@@ -194,7 +202,7 @@ mod tests {
         let output = tempdir
             .path()
             .join(PathBuf::from("nested/git.twocp-provider"));
-        fs::write(&input, fixture_json()).expect("fixture should write");
+        fs::write(&input, git_fixture_json()).expect("fixture should write");
 
         compile_json_file_to_file(&input, &output).expect("compile should pass");
         let bytes = fs::read(output).expect("artifact should exist");
@@ -208,7 +216,7 @@ mod tests {
     #[test]
     fn provider_compiler_rejects_duplicate_flag_aliases() {
         let mut source: ProviderSourceFile =
-            serde_json::from_slice(fixture_json()).expect("fixture should parse");
+            serde_json::from_slice(git_fixture_json()).expect("fixture should parse");
         source.root.flags.push(FlagSpec {
             long: "help".into(),
             short: None,
@@ -224,5 +232,33 @@ mod tests {
 
         let error = compile_source_file(source).expect_err("duplicate flag should fail");
         assert!(error.to_string().contains("duplicate flag"));
+    }
+
+    #[test]
+    fn provider_compiler_rejects_duplicate_resource_aliases() {
+        let mut source: ProviderSourceFile =
+            serde_json::from_slice(kubectl_fixture_json()).expect("fixture should parse");
+        if let Some(get_node) = source
+            .root
+            .subcommands
+            .iter_mut()
+            .find(|node| node.name == "get")
+        {
+            get_node.subcommands.push(CommandNode {
+                kind: CommandNodeKind::Command,
+                name: "pods-copy".into(),
+                summary: None,
+                aliases: vec!["po".into()],
+                hidden: false,
+                deprecated: false,
+                priority: 1,
+                subcommands: Vec::new(),
+                flags: Vec::new(),
+                positional_args: Vec::new(),
+            });
+        }
+
+        let error = compile_source_file(source).expect_err("duplicate alias should fail");
+        assert!(error.to_string().contains("duplicate subcommand or alias"));
     }
 }

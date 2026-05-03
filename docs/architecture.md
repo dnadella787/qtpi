@@ -41,7 +41,7 @@ Phase 2 adds a repo-local `shell/zsh/twocp.zsh` bridge instead of a new shell cr
 
 Phase 3 keeps the same crate layout while adding a built-in provider-root index and a second validation CLI. Exact root discovery is now a small startup contract separate from provider instantiation, so the suggest path can select `git` or `kubectl` without eagerly deserializing unrelated providers.
 
-Phase 4 keeps the same crate layout while adding provider-scoped value-slot resolution, enum-backed value suggestions, and the first bounded dynamic lookup path for `kubectl` pod names. The current live lookup path stays single-process and stateless per request, so cache policy is explicit and persisted outside process memory instead of relying on a resident helper.
+Phase 4 keeps the same crate layout while adding provider-scoped value-slot resolution, enum-backed value suggestions, and bounded dynamic lookup paths layered on top of built-in artifacts. The current live lookup paths stay single-process and stateless per request, so cache policy is explicit and persisted outside process memory instead of relying on a resident helper.
 
 ## Rendering Bias
 
@@ -55,7 +55,7 @@ Reason:
 
 Phase 1 stops short of painting entirely. The current Rust surface only shapes a normalized `render_model`; terminal control remains deferred to the future shell bridge.
 
-The current Phase 2 bridge still follows that rule. Rust returns structured suggestions and replacement ranges, while `zsh` paints a bounded list using shell-owned display state instead of moving terminal control into Rust.
+The current Phase 2 bridge still follows that rule. Rust returns structured suggestions and replacement ranges, while `zsh` owns the interactive selection state and paints a fixed 5-row overlay below the prompt using terminal capabilities loaded through `zsh/terminfo`. The bridge keeps menu state transitions for show, typed refresh, movement, and invalidation in bridge-local helpers, then clears and repaints the overlay from explicit `zle`, `precmd`, and `preexec` lifecycle hooks. The editable buffer stays under `zle` ownership, and the bridge degrades to “no dropdown shown” when safe cursor-addressed painting is unavailable. Rust remains responsible only for suggestion generation, ranking, replacement ranges, and row text.
 
 ## Shell Strategy
 

@@ -7,6 +7,7 @@ use twocp_core::providers::{
 };
 use twocp_core::spec::ProviderId;
 
+use crate::git::GitProvider;
 use crate::kubectl::KubectlProvider;
 
 static GIT_MINIMAL_PROVIDER: &[u8] =
@@ -67,7 +68,14 @@ impl ProviderCatalog for BuiltinCatalog {
             .get(provider_id)
             .copied()
             .ok_or_else(|| CatalogError::UnknownProvider(provider_id.clone()))?;
-        if provider_id == &ProviderId::from("builtin.kubectl") {
+        if provider_id == &ProviderId::from("builtin.git") {
+            let provider =
+                GitProvider::from_bytes(bytes).map_err(|source| CatalogError::InvalidArtifact {
+                    provider_id: provider_id.clone(),
+                    source,
+                })?;
+            Ok(Box::new(provider))
+        } else if provider_id == &ProviderId::from("builtin.kubectl") {
             let provider = KubectlProvider::from_bytes(bytes).map_err(|source| {
                 CatalogError::InvalidArtifact {
                     provider_id: provider_id.clone(),
@@ -106,6 +114,8 @@ pub fn builtin_summary(provider_id: &ProviderId) -> Result<(String, usize, usize
 mod tests {
     use super::*;
     use twocp_core::artifact::decode_artifact;
+    use twocp_core::engine::SuggestEngine;
+    use twocp_core::protocol::{ShellKind, SuggestRequest};
 
     #[test]
     fn built_in_catalog_indexes_git_and_kubectl() {
@@ -135,7 +145,7 @@ mod tests {
             .expect("git provider should load");
         let summary = provider.root_summary();
         assert_eq!(summary.command_name, "git");
-        assert!(summary.subcommand_count >= 3);
+        assert!(summary.subcommand_count >= 20);
     }
 
     #[test]
@@ -169,5 +179,49 @@ mod tests {
             .expect("git provider should still load");
         assert_eq!(provider.root_summary().command_name, "git");
         assert!(decode_artifact(&[0_u8, 1, 2, 3]).is_err());
+    }
+
+    #[test]
+    fn builtin_git_root_and_prefix_flows_rank_expected_commands() {
+        let catalog = builtin_catalog().expect("catalog should load");
+        let engine = SuggestEngine::new(&catalog).with_max_suggestions(8);
+
+        let root = engine.suggest(&SuggestRequest::minimal(ShellKind::Zsh, "git ", 4));
+        assert!(
+            root.suggestions
+                .iter()
+                .any(|item| item.display == "checkout")
+        );
+        assert!(root.suggestions.iter().any(|item| item.display == "commit"));
+
+        let narrowed = engine.suggest(&SuggestRequest::minimal(ShellKind::Zsh, "git ch", 6));
+        assert_eq!(narrowed.suggestions[0].display, "checkout");
+        assert_eq!(narrowed.suggestions[1].display, "cherry-pick");
+    }
+
+    #[test]
+    fn builtin_kubectl_root_flow_includes_common_families() {
+        let catalog = builtin_catalog().expect("catalog should load");
+        let engine = SuggestEngine::new(&catalog).with_max_suggestions(8);
+        let response = engine.suggest(&SuggestRequest::minimal(ShellKind::Zsh, "kubectl ", 8));
+
+        assert!(
+            response
+                .suggestions
+                .iter()
+                .any(|item| item.display == "get")
+        );
+        assert!(
+            response
+                .suggestions
+                .iter()
+                .any(|item| item.display == "describe")
+        );
+        assert!(
+            response
+                .suggestions
+                .iter()
+                .any(|item| item.display == "config")
+        );
     }
 }

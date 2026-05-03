@@ -15,13 +15,13 @@ use twocp_core::providers::{
     ProviderRootSummary, ProviderScope,
 };
 use twocp_core::spec::{
-    CacheMode, CacheStatus, DynamicLookupRequest, DynamicLookupResult, DynamicLookupStatus,
-    LookupMatch, ProviderId,
+    CacheStatus, DynamicLookupRequest, DynamicLookupResult, DynamicLookupStatus, LookupMatch,
+    ProviderId,
 };
 
 const DEFAULT_CACHE_TTL_MS: u32 = 5_000;
 const DEFAULT_TIMEOUT_MS: u32 = 120;
-const CACHE_VERSION: u8 = 2;
+const CACHE_VERSION: u8 = 3;
 const ALL_NAMESPACES_SENTINEL: &str = "*";
 const EXPLICIT_KUBECONFIG_PREFIX: &str = "explicit:";
 
@@ -84,7 +84,6 @@ impl Provider for KubectlProvider {
         request.budget.timeout_ms = DEFAULT_TIMEOUT_MS;
         request.budget.max_candidates = max_candidates.min(8).min(u16::MAX as usize) as u16;
         request.allow_stale_cache = true;
-
         Some(request)
     }
 
@@ -101,15 +100,11 @@ struct KubectlDynamicValueProvider {
 
 impl DynamicValueProvider for KubectlDynamicValueProvider {
     fn dynamic_lookup(&self, request: &DynamicLookupRequest) -> DynamicLookupResult {
-        if !matches!(
-            request.slot_id.as_str(),
-            "kubectl.describe.pod.name" | "kubectl.logs.pod.name"
-        ) {
+        let Some(lookup_kind) = lookup_kind(request) else {
             return DynamicLookupResult::unsupported();
-        }
+        };
 
         let started = Instant::now();
-        let cache_policy = CacheMode::PreferCache;
         let cache_key = cache_key(request);
         let cached = read_cache(
             cache_path(self.cache_dir_override.as_ref(), &cache_key),
@@ -122,11 +117,7 @@ impl DynamicValueProvider for KubectlDynamicValueProvider {
                 request.budget.max_candidates,
             );
             return DynamicLookupResult {
-                status: if matches.is_empty() {
-                    DynamicLookupStatus::NoMatch
-                } else {
-                    DynamicLookupStatus::Complete
-                },
+                status: status_for_matches(&matches),
                 matches,
                 cache_status: CacheStatus::HitFresh,
                 degraded: false,
@@ -144,7 +135,19 @@ impl DynamicValueProvider for KubectlDynamicValueProvider {
             );
         }
 
-        match fetch_pod_snapshot(request, self.kubectl_bin_override.as_ref()) {
+        let fetch_result = match lookup_kind {
+            KubectlLookupKind::ResourceName => {
+                fetch_resource_snapshot(request, self.kubectl_bin_override.as_ref())
+            }
+            KubectlLookupKind::Namespace => {
+                fetch_namespace_snapshot(request, self.kubectl_bin_override.as_ref())
+            }
+            KubectlLookupKind::Context => {
+                fetch_context_snapshot(request, self.kubectl_bin_override.as_ref())
+            }
+        };
+
+        match fetch_result {
             Ok(matches) => {
                 let _ = write_cache(
                     cache_path(self.cache_dir_override.as_ref(), &cache_key),
@@ -155,16 +158,9 @@ impl DynamicValueProvider for KubectlDynamicValueProvider {
                     request.budget.max_candidates,
                 );
                 DynamicLookupResult {
-                    status: if matches.is_empty() {
-                        DynamicLookupStatus::NoMatch
-                    } else {
-                        DynamicLookupStatus::Complete
-                    },
+                    status: status_for_matches(&matches),
                     matches,
-                    cache_status: match cache_policy {
-                        CacheMode::PreferCache => CacheStatus::Miss,
-                        _ => CacheStatus::NotChecked,
-                    },
+                    cache_status: CacheStatus::Miss,
                     degraded: false,
                     lookup_time_ms: elapsed_ms(started),
                 }
@@ -215,6 +211,26 @@ enum FetchError {
     Process,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum KubectlLookupKind {
+    ResourceName,
+    Namespace,
+    Context,
+}
+
+fn lookup_kind(request: &DynamicLookupRequest) -> Option<KubectlLookupKind> {
+    match request.slot_id.as_str() {
+        "kubectl.root.namespace" => Some(KubectlLookupKind::Namespace),
+        "kubectl.root.context" | "kubectl.config.use_context.name" => {
+            Some(KubectlLookupKind::Context)
+        }
+        slot_id if slot_id.starts_with("kubectl.") && slot_id.ends_with(".name") => {
+            Some(KubectlLookupKind::ResourceName)
+        }
+        _ => None,
+    }
+}
+
 fn kubectl_namespace_scope(query: &ProviderQuery) -> Option<String> {
     if query
         .command_tokens
@@ -255,7 +271,36 @@ fn kubectl_resource_kind(scope: &ProviderScope) -> Option<String> {
         .as_ref()
         .map(|slot_id| slot_id.as_str())
     {
-        Some("kubectl.describe.pod.name") | Some("kubectl.logs.pod.name") => Some("pods".into()),
+        Some("kubectl.root.namespace")
+        | Some("kubectl.root.context")
+        | Some("kubectl.config.use_context.name") => None,
+        Some("kubectl.logs.pod.name") | Some("kubectl.exec.pod.name") => Some("pods".into()),
+        Some(_) => scope
+            .command_path
+            .segments()
+            .last()
+            .and_then(|segment| canonical_resource_kind(segment)),
+        None => None,
+    }
+}
+
+fn canonical_resource_kind(segment: &str) -> Option<String> {
+    match segment {
+        "pods"
+        | "deployments"
+        | "replicasets"
+        | "statefulsets"
+        | "daemonsets"
+        | "jobs"
+        | "cronjobs"
+        | "services"
+        | "ingresses"
+        | "configmaps"
+        | "secrets"
+        | "namespaces"
+        | "nodes"
+        | "events"
+        | "persistentvolumeclaims" => Some(segment.to_string()),
         _ => None,
     }
 }
@@ -354,11 +399,35 @@ fn truncate_matches(matches: &[LookupMatch], max_candidates: u16) -> Vec<LookupM
         .collect()
 }
 
-fn fetch_pod_snapshot(
+fn status_for_matches(matches: &[LookupMatch]) -> DynamicLookupStatus {
+    if matches.is_empty() {
+        DynamicLookupStatus::NoMatch
+    } else {
+        DynamicLookupStatus::Complete
+    }
+}
+
+fn fetch_resource_snapshot(
     request: &DynamicLookupRequest,
     kubectl_bin_override: Option<&PathBuf>,
 ) -> Result<Vec<LookupMatch>, FetchError> {
-    let output = run_kubectl(request, kubectl_bin_override)?;
+    let Some(resource_kind) = request.scope.resource_kind.as_deref() else {
+        return Err(FetchError::Process);
+    };
+
+    let output = run_kubectl(
+        request,
+        kubectl_bin_override,
+        &[
+            "get",
+            resource_kind,
+            "--no-headers",
+            "-o",
+            "custom-columns=NAME:.metadata.name,NAMESPACE:.metadata.namespace",
+        ],
+        should_include_namespace_scope(resource_kind),
+    )?;
+
     let mut rows = Vec::new();
     for line in output.lines() {
         let mut columns = line.split_whitespace();
@@ -370,10 +439,80 @@ fn fetch_pod_snapshot(
     }
 
     rows.sort_by(|left, right| left.0.cmp(&right.0));
-    Ok(pod_rows_to_matches(rows, request))
+    Ok(resource_rows_to_matches(rows, request))
 }
 
-fn pod_rows_to_matches(
+fn fetch_namespace_snapshot(
+    request: &DynamicLookupRequest,
+    kubectl_bin_override: Option<&PathBuf>,
+) -> Result<Vec<LookupMatch>, FetchError> {
+    let output = run_kubectl(
+        request,
+        kubectl_bin_override,
+        &[
+            "get",
+            "namespaces",
+            "--no-headers",
+            "-o",
+            "custom-columns=NAME:.metadata.name",
+        ],
+        false,
+    )?;
+
+    let mut names: Vec<String> = output
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(ToOwned::to_owned)
+        .collect();
+    names.sort();
+
+    Ok(names
+        .into_iter()
+        .map(|name| LookupMatch {
+            value: name.clone(),
+            display: name,
+            annotation: None,
+            confidence: 90,
+            requires_quoting: false,
+            is_stale: false,
+        })
+        .collect())
+}
+
+fn fetch_context_snapshot(
+    request: &DynamicLookupRequest,
+    kubectl_bin_override: Option<&PathBuf>,
+) -> Result<Vec<LookupMatch>, FetchError> {
+    let output = run_kubectl(
+        request,
+        kubectl_bin_override,
+        &["config", "get-contexts", "-o", "name"],
+        false,
+    )?;
+
+    let mut names: Vec<String> = output
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(ToOwned::to_owned)
+        .collect();
+    names.sort();
+
+    Ok(names
+        .into_iter()
+        .map(|name| LookupMatch {
+            value: name.clone(),
+            display: name,
+            annotation: None,
+            confidence: 90,
+            requires_quoting: false,
+            is_stale: false,
+        })
+        .collect())
+}
+
+fn resource_rows_to_matches(
     rows: Vec<(String, String)>,
     request: &DynamicLookupRequest,
 ) -> Vec<LookupMatch> {
@@ -426,6 +565,8 @@ fn filter_matches_for_request(
 fn run_kubectl(
     request: &DynamicLookupRequest,
     kubectl_bin_override: Option<&PathBuf>,
+    args: &[&str],
+    include_namespace_scope: bool,
 ) -> Result<String, FetchError> {
     let kubectl_bin = kubectl_bin_override.cloned().unwrap_or_else(|| {
         env::var_os("TWOCP_KUBECTL_BIN")
@@ -434,11 +575,7 @@ fn run_kubectl(
     });
     let mut command = Command::new(kubectl_bin);
     command
-        .arg("get")
-        .arg("pods")
-        .arg("--no-headers")
-        .arg("-o")
-        .arg("custom-columns=NAME:.metadata.name,NAMESPACE:.metadata.namespace")
+        .args(args)
         .current_dir(&request.scope.cwd)
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
@@ -451,18 +588,28 @@ fn run_kubectl(
         command.arg("--kubeconfig").arg(kubeconfig);
     }
 
-    match request.scope.namespace.as_deref() {
-        Some(ALL_NAMESPACES_SENTINEL) => {
-            command.arg("-A");
+    if include_namespace_scope {
+        match request.scope.namespace.as_deref() {
+            Some(ALL_NAMESPACES_SENTINEL) => {
+                command.arg("-A");
+            }
+            Some(namespace) => {
+                command.arg("-n").arg(namespace);
+            }
+            None => {}
         }
-        Some(namespace) => {
-            command.arg("-n").arg(namespace);
-        }
-        None => {}
     }
 
+    run_command(command, request.budget.timeout_ms)
+}
+
+fn should_include_namespace_scope(resource_kind: &str) -> bool {
+    !matches!(resource_kind, "namespaces" | "nodes")
+}
+
+fn run_command(mut command: Command, timeout_ms: u32) -> Result<String, FetchError> {
     let mut child = command.spawn().map_err(|_| FetchError::Process)?;
-    let timeout = Duration::from_millis(u64::from(request.budget.timeout_ms));
+    let timeout = Duration::from_millis(u64::from(timeout_ms));
     let started = Instant::now();
 
     loop {
@@ -585,9 +732,7 @@ mod tests {
 
     use tempfile::tempdir;
     use twocp_core::providers::Provider;
-    use twocp_core::spec::{
-        CommandPath, DynamicLookupBudget, DynamicLookupScope, ProviderId, SlotId,
-    };
+    use twocp_core::spec::{CommandPath, DynamicLookupBudget, DynamicLookupScope, SlotId};
 
     use super::*;
 
@@ -600,7 +745,7 @@ mod tests {
     }
 
     #[test]
-    fn resolve_scope_captures_namespace_context_kubeconfig_and_dynamic_pod_slot() {
+    fn resolve_scope_captures_namespace_context_kubeconfig_and_dynamic_resource_slot() {
         let provider = kubectl_provider();
         let scope = provider.resolve_scope(&ProviderQuery {
             provider_id: ProviderId::from("builtin.kubectl"),
@@ -630,7 +775,7 @@ mod tests {
         );
         assert_eq!(
             scope.active_slot_id,
-            Some(SlotId::from("kubectl.describe.pod.name"))
+            Some(SlotId::from("kubectl.describe.pods.name"))
         );
         assert_eq!(scope.lookup_scope.namespace.as_deref(), Some("kube-system"));
         assert_eq!(scope.lookup_scope.resource_kind.as_deref(), Some("pods"));
@@ -638,6 +783,51 @@ mod tests {
         assert_eq!(
             scope.lookup_scope.region.as_deref(),
             Some("explicit:/tmp/twocp-kubeconfig")
+        );
+    }
+
+    #[test]
+    fn resolve_scope_supports_get_pods_and_use_context_dynamic_slots() {
+        let provider = kubectl_provider();
+
+        let get_scope = provider.resolve_scope(&ProviderQuery {
+            provider_id: ProviderId::from("builtin.kubectl"),
+            command_tokens: vec!["get".into(), "pods".into()],
+            completion_position: twocp_core::parser::CompletionPosition::Value,
+            active_fragment: String::new(),
+            replace_range: twocp_core::protocol::ReplaceRange {
+                start_byte: 16,
+                end_byte: 16,
+            },
+            active_slot_id: None,
+            degraded_parse: None,
+            cwd: PathBuf::from("."),
+        });
+        assert_eq!(
+            get_scope.active_slot_id,
+            Some(SlotId::from("kubectl.get.pods.name"))
+        );
+        assert_eq!(
+            get_scope.lookup_scope.resource_kind.as_deref(),
+            Some("pods")
+        );
+
+        let context_scope = provider.resolve_scope(&ProviderQuery {
+            provider_id: ProviderId::from("builtin.kubectl"),
+            command_tokens: vec!["config".into(), "use-context".into()],
+            completion_position: twocp_core::parser::CompletionPosition::Value,
+            active_fragment: String::new(),
+            replace_range: twocp_core::protocol::ReplaceRange {
+                start_byte: 27,
+                end_byte: 27,
+            },
+            active_slot_id: None,
+            degraded_parse: None,
+            cwd: PathBuf::from("."),
+        });
+        assert_eq!(
+            context_scope.active_slot_id,
+            Some(SlotId::from("kubectl.config.use_context.name"))
         );
     }
 
@@ -657,25 +847,15 @@ mod tests {
         permissions.set_mode(0o755);
         fs::set_permissions(&script_path, permissions).expect("script should be executable");
 
-        let request = DynamicLookupRequest {
-            provider_id: ProviderId::from("builtin.kubectl"),
-            command_path: CommandPath(vec!["describe".into(), "pods".into()]),
-            slot_id: SlotId::from("kubectl.describe.pod.name"),
-            partial_input: "pod".into(),
-            scope: DynamicLookupScope {
-                namespace: Some("kube-system".into()),
-                resource_kind: Some("pods".into()),
-                profile: None,
-                region: None,
-                cwd: tempdir.path().to_path_buf(),
-            },
-            budget: DynamicLookupBudget {
-                timeout_ms: 25,
-                max_candidates: 8,
-                allow_subprocess: true,
-            },
-            allow_stale_cache: true,
-        };
+        let request = resource_lookup_request(
+            tempdir.path(),
+            "kubectl.describe.pods.name",
+            CommandPath(vec!["describe".into(), "pods".into()]),
+            "pods",
+            "pod",
+            Some("kube-system"),
+            None,
+        );
 
         let cache_key = cache_key(&request);
         let provider = KubectlDynamicValueProvider {
@@ -725,9 +905,33 @@ mod tests {
             cache_dir_override: Some(cache_dir),
             kubectl_bin_override: Some(script_path),
         };
-        let narrow = pod_lookup_request(tempdir.path(), "api-t", None);
-        let broad = pod_lookup_request(tempdir.path(), "api", None);
-        let worker = pod_lookup_request(tempdir.path(), "work", None);
+        let narrow = resource_lookup_request(
+            tempdir.path(),
+            "kubectl.describe.pods.name",
+            CommandPath(vec!["describe".into(), "pods".into()]),
+            "pods",
+            "api-t",
+            Some("default"),
+            None,
+        );
+        let broad = resource_lookup_request(
+            tempdir.path(),
+            "kubectl.describe.pods.name",
+            CommandPath(vec!["describe".into(), "pods".into()]),
+            "pods",
+            "api",
+            Some("default"),
+            None,
+        );
+        let worker = resource_lookup_request(
+            tempdir.path(),
+            "kubectl.describe.pods.name",
+            CommandPath(vec!["describe".into(), "pods".into()]),
+            "pods",
+            "work",
+            Some("default"),
+            None,
+        );
 
         let first = provider.dynamic_lookup(&narrow);
         assert_eq!(first.cache_status, CacheStatus::Miss);
@@ -778,13 +982,29 @@ mod tests {
             kubectl_bin_override: Some(script_path),
         };
 
-        let context_a = pod_lookup_request(tempdir.path(), "pod", Some("ctx-a"));
+        let context_a = resource_lookup_request(
+            tempdir.path(),
+            "kubectl.describe.pods.name",
+            CommandPath(vec!["describe".into(), "pods".into()]),
+            "pods",
+            "pod",
+            Some("default"),
+            Some("ctx-a"),
+        );
         let result_a = provider.dynamic_lookup(&context_a);
         assert_eq!(result_a.cache_status, CacheStatus::Miss);
         assert_eq!(result_a.status, DynamicLookupStatus::Complete);
         assert_eq!(result_a.matches[0].display, "pod-a");
 
-        let context_b = pod_lookup_request(tempdir.path(), "pod", Some("ctx-b"));
+        let context_b = resource_lookup_request(
+            tempdir.path(),
+            "kubectl.describe.pods.name",
+            CommandPath(vec!["describe".into(), "pods".into()]),
+            "pods",
+            "pod",
+            Some("default"),
+            Some("ctx-b"),
+        );
         let result_b = provider.dynamic_lookup(&context_b);
         assert_eq!(result_b.cache_status, CacheStatus::Miss);
         assert_eq!(result_b.status, DynamicLookupStatus::Complete);
@@ -795,6 +1015,73 @@ mod tests {
         assert_eq!(result_a_cached.matches[0].display, "pod-a");
     }
 
+    #[test]
+    fn namespace_and_context_slots_use_dedicated_lookup_paths() {
+        let tempdir = tempdir().expect("tempdir should exist");
+        let cache_dir = tempdir.path().join("cache");
+        let script_path = tempdir.path().join("kubectl");
+        write_executable_script(
+            &script_path,
+            "#!/bin/sh\nif [ \"$1\" = 'get' ] && [ \"$2\" = 'namespaces' ]; then\n  printf 'default\\nkube-system\\n'\n  exit 0\nfi\nif [ \"$1\" = 'config' ] && [ \"$2\" = 'get-contexts' ]; then\n  printf 'ctx-a\\nctx-b\\n'\n  exit 0\nfi\nexit 7\n",
+        );
+
+        let provider = KubectlDynamicValueProvider {
+            cache_dir_override: Some(cache_dir),
+            kubectl_bin_override: Some(script_path),
+        };
+
+        let namespaces = provider.dynamic_lookup(&DynamicLookupRequest {
+            provider_id: ProviderId::from("builtin.kubectl"),
+            command_path: CommandPath::root(),
+            slot_id: SlotId::from("kubectl.root.namespace"),
+            partial_input: "ku".into(),
+            scope: DynamicLookupScope {
+                namespace: None,
+                resource_kind: None,
+                profile: Some("ctx-a".into()),
+                region: None,
+                cwd: tempdir.path().to_path_buf(),
+            },
+            budget: DynamicLookupBudget {
+                timeout_ms: 1_000,
+                max_candidates: 8,
+                allow_subprocess: true,
+            },
+            allow_stale_cache: true,
+        });
+        assert_eq!(namespaces.status, DynamicLookupStatus::Complete);
+        assert_eq!(namespaces.matches[0].display, "kube-system");
+
+        let contexts = provider.dynamic_lookup(&DynamicLookupRequest {
+            provider_id: ProviderId::from("builtin.kubectl"),
+            command_path: CommandPath(vec!["config".into(), "use-context".into()]),
+            slot_id: SlotId::from("kubectl.config.use_context.name"),
+            partial_input: "ctx".into(),
+            scope: DynamicLookupScope {
+                namespace: None,
+                resource_kind: None,
+                profile: None,
+                region: None,
+                cwd: tempdir.path().to_path_buf(),
+            },
+            budget: DynamicLookupBudget {
+                timeout_ms: 1_000,
+                max_candidates: 8,
+                allow_subprocess: true,
+            },
+            allow_stale_cache: true,
+        });
+        assert_eq!(contexts.status, DynamicLookupStatus::Complete);
+        assert_eq!(
+            contexts
+                .matches
+                .iter()
+                .map(|candidate| candidate.display.as_str())
+                .collect::<Vec<_>>(),
+            vec!["ctx-a", "ctx-b"]
+        );
+    }
+
     fn write_executable_script(path: &std::path::Path, contents: &str) {
         fs::write(path, contents).expect("script should write");
         let mut permissions = fs::metadata(path).expect("script metadata").permissions();
@@ -802,19 +1089,23 @@ mod tests {
         fs::set_permissions(path, permissions).expect("script should be executable");
     }
 
-    fn pod_lookup_request(
+    fn resource_lookup_request(
         cwd: &std::path::Path,
+        slot_id: &str,
+        command_path: CommandPath,
+        resource_kind: &str,
         partial_input: &str,
+        namespace: Option<&str>,
         context: Option<&str>,
     ) -> DynamicLookupRequest {
         DynamicLookupRequest {
             provider_id: ProviderId::from("builtin.kubectl"),
-            command_path: CommandPath(vec!["describe".into(), "pods".into()]),
-            slot_id: SlotId::from("kubectl.describe.pod.name"),
+            command_path,
+            slot_id: SlotId::from(slot_id),
             partial_input: partial_input.into(),
             scope: DynamicLookupScope {
-                namespace: Some("default".into()),
-                resource_kind: Some("pods".into()),
+                namespace: namespace.map(String::from),
+                resource_kind: Some(resource_kind.into()),
                 profile: context.map(String::from),
                 region: None,
                 cwd: cwd.to_path_buf(),

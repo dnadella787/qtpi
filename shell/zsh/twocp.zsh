@@ -1,4 +1,4 @@
-autoload -Uz add-zsh-hook
+autoload -Uz add-zsh-hook add-zle-hook-widget
 zmodload zsh/terminfo 2>/dev/null || true
 
 if (( ${+functions[twocp_zsh_disable]} )) && (( ${__twocp_enabled:-0} )); then
@@ -6,19 +6,18 @@ if (( ${+functions[twocp_zsh_disable]} )) && (( ${__twocp_enabled:-0} )); then
 fi
 
 typeset -g TWOCP_BIN="${TWOCP_BIN:-twocp}"
-typeset -gi TWOCP_MAX_ROWS="${TWOCP_MAX_ROWS:-5}"
 typeset -gi TWOCP_MAX_SUGGESTIONS="${TWOCP_MAX_SUGGESTIONS:-50}"
 typeset -g TWOCP_KEY_SHOW="${TWOCP_KEY_SHOW:-^X2s}"
-typeset -g TWOCP_KEY_ACCEPT="${TWOCP_KEY_ACCEPT:-^X2a}"
-typeset -g TWOCP_KEY_DISMISS="${TWOCP_KEY_DISMISS:-^X2d}"
-typeset -g TWOCP_KEY_NEXT="${TWOCP_KEY_NEXT:-^X2j}"
-typeset -g TWOCP_KEY_PREVIOUS="${TWOCP_KEY_PREVIOUS:-^X2k}"
 typeset -g TWOCP_KEY_ENTER="${TWOCP_KEY_ENTER:-^M}"
 typeset -g TWOCP_KEY_ENTER_ALT="${TWOCP_KEY_ENTER_ALT:-^J}"
+typeset -g TWOCP_KEY_ESCAPE="${TWOCP_KEY_ESCAPE:-^[}"
+typeset -g TWOCP_KEY_BACKSPACE="${TWOCP_KEY_BACKSPACE:-^?}"
+typeset -g TWOCP_KEY_BACKSPACE_ALT="${TWOCP_KEY_BACKSPACE_ALT:-^H}"
 typeset -g TWOCP_KEY_DOWN="${TWOCP_KEY_DOWN:-^[[B}"
 typeset -g TWOCP_KEY_UP="${TWOCP_KEY_UP:-^[[A}"
 typeset -g TWOCP_KEY_DOWN_ALT="${TWOCP_KEY_DOWN_ALT:-^[OB}"
 typeset -g TWOCP_KEY_UP_ALT="${TWOCP_KEY_UP_ALT:-^[OA}"
+typeset -g TWOCP_KEY_INTERRUPT="${TWOCP_KEY_INTERRUPT:-^C}"
 typeset -g TWOCP_AUTO_ROOTS="${TWOCP_AUTO_ROOTS:-git kubectl k}"
 typeset -g TWOCP_DEBUG_LOG="${TWOCP_DEBUG_LOG:-}"
 
@@ -30,12 +29,10 @@ typeset -g __twocp_request_buffer=''
 typeset -g __twocp_dynamic_slot_id=''
 typeset -g __twocp_lookup_status='not_checked'
 typeset -g __twocp_cache_status='not_checked'
-typeset -g __twocp_saved_postdisplay=''
-typeset -g __twocp_rendered_postdisplay=''
-typeset -gi __twocp_owns_postdisplay=0
 typeset -gi __twocp_autosuggest_suppressed=0
 typeset -gi __twocp_menu_visible=0
-typeset -gi __twocp_selection_index=0
+typeset -gi __twocp_selection_index=-1
+typeset -gi __twocp_selection_touched=0
 typeset -gi __twocp_replace_start=0
 typeset -gi __twocp_replace_end=0
 typeset -gi __twocp_request_cursor=0
@@ -44,7 +41,16 @@ typeset -gi __twocp_lookup_count=0
 typeset -gi __twocp_lookup_time_ms=0
 typeset -gi __twocp_after_widget_fd=-1
 typeset -g __twocp_after_widget_pid=''
-typeset -g __twocp_after_widget_action=''
+typeset -gi __twocp_overlay_supported=-1
+typeset -gi __twocp_overlay_highlight_supported=0
+typeset -g __twocp_overlay_highlight_enter=''
+typeset -g __twocp_overlay_highlight_exit=''
+typeset -gi __twocp_overlay_visible_rows=5
+typeset -gi __twocp_overlay_window_start=0
+typeset -gi __twocp_overlay_origin_row=0
+typeset -gi __twocp_rendered_row_count=0
+typeset -gi __twocp_skip_next_pre_redraw_clear=0
+typeset -gi __twocp_transient_bindings_active=0
 typeset -ga __twocp_insert_texts=()
 typeset -ga __twocp_displays=()
 typeset -ga __twocp_annotations=()
@@ -66,13 +72,15 @@ function __twocp_reset_state() {
   __twocp_lookup_status='not_checked'
   __twocp_cache_status='not_checked'
   __twocp_menu_visible=0
-  __twocp_selection_index=0
+  __twocp_selection_index=-1
+  __twocp_selection_touched=0
   __twocp_replace_start=0
   __twocp_replace_end=0
   __twocp_request_cursor=0
   __twocp_truncated_count=0
   __twocp_lookup_count=0
   __twocp_lookup_time_ms=0
+  __twocp_reset_overlay_state
   __twocp_insert_texts=()
   __twocp_displays=()
   __twocp_annotations=()
@@ -97,37 +105,132 @@ function __twocp_cancel_after_widget_refresh() {
     wait "${__twocp_after_widget_pid}" 2>/dev/null || true
     __twocp_after_widget_pid=''
   fi
-  __twocp_after_widget_action=''
-}
-
-function __twocp_redraw() {
-  if [[ -n "${WIDGET:-}" ]]; then
-    zle -I 2>/dev/null || true
-    zle -R 2>/dev/null || true
-    zle redisplay 2>/dev/null || true
-  fi
-}
-
-function __twocp_redisplay() {
-  if [[ -n "${WIDGET:-}" ]]; then
-    zle redisplay 2>/dev/null || true
-  fi
 }
 
 function __twocp_set_status_message() {
-  if [[ -n "${WIDGET:-}" ]]; then
-    zle -M "$1" 2>/dev/null || true
-  fi
+  :
 }
 
-function __twocp_take_postdisplay() {
-  if (( ! __twocp_owns_postdisplay )); then
-    __twocp_saved_postdisplay="${POSTDISPLAY-}"
-    __twocp_owns_postdisplay=1
-  fi
+function __twocp_buffer_has_content() {
+  [[ -n "${BUFFER//[[:space:]]/}" ]]
 }
 
-function __twocp_clear_highlight() {
+function __twocp_reset_overlay_state() {
+  __twocp_overlay_window_start=0
+  __twocp_overlay_origin_row=0
+  __twocp_rendered_row_count=0
+  __twocp_skip_next_pre_redraw_clear=0
+  __twocp_overlay_highlight_supported=0
+  __twocp_overlay_highlight_enter=''
+  __twocp_overlay_highlight_exit=''
+}
+
+function __twocp_suggestion_count() {
+  REPLY="${#__twocp_insert_texts[@]}"
+}
+
+function __twocp_overlay_max_window_start() {
+  local total="$1"
+  local max_window_start=$(( total - __twocp_overlay_visible_rows ))
+
+  if (( max_window_start < 0 )); then
+    max_window_start=0
+  fi
+
+  REPLY="${max_window_start}"
+}
+
+function __twocp_overlay_window_end_index() {
+  local total="$1"
+  local window_end=$(( __twocp_overlay_window_start + __twocp_overlay_visible_rows ))
+
+  if (( window_end > total )); then
+    window_end=${total}
+  fi
+
+  REPLY="${window_end}"
+}
+
+function __twocp_begin_menu_refresh() {
+  local total=${#__twocp_insert_texts[@]}
+
+  if (( total == 0 )); then
+    __twocp_menu_visible=0
+    __twocp_selection_index=-1
+    __twocp_overlay_window_start=0
+    return 1
+  fi
+
+  __twocp_menu_visible=1
+  __twocp_selection_index=0
+  __twocp_selection_touched=0
+  __twocp_overlay_window_start=0
+  return 0
+}
+
+function __twocp_move_selection_down() {
+  local total=${#__twocp_insert_texts[@]}
+
+  if (( ! __twocp_menu_visible || total == 0 )); then
+    return 1
+  fi
+
+  if (( __twocp_selection_index < total - 1 )); then
+    __twocp_selection_index=$(( __twocp_selection_index + 1 ))
+    __twocp_selection_touched=1
+    if (( __twocp_selection_index >= __twocp_overlay_window_start + __twocp_overlay_visible_rows )); then
+      __twocp_overlay_window_start=$(( __twocp_selection_index - __twocp_overlay_visible_rows + 1 ))
+    fi
+  fi
+
+  return 0
+}
+
+function __twocp_move_selection_up() {
+  local total=${#__twocp_insert_texts[@]}
+
+  if (( ! __twocp_menu_visible || total == 0 )); then
+    return 1
+  fi
+
+  if (( __twocp_selection_index > 0 )); then
+    __twocp_selection_index=$(( __twocp_selection_index - 1 ))
+    __twocp_selection_touched=1
+    if (( __twocp_selection_index < __twocp_overlay_window_start )); then
+      __twocp_overlay_window_start=${__twocp_selection_index}
+    fi
+  fi
+
+  return 0
+}
+
+function __twocp_menu_state_valid() {
+  local total=${#__twocp_insert_texts[@]}
+
+  if (( ! __twocp_menu_visible || total == 0 )); then
+    return 1
+  fi
+
+  if (( __twocp_selection_index < 0 || __twocp_selection_index >= total )); then
+    return 1
+  fi
+
+  __twocp_overlay_max_window_start "${total}"
+  local max_window_start="${REPLY}"
+  if (( __twocp_overlay_window_start < 0 || __twocp_overlay_window_start > max_window_start )); then
+    return 1
+  fi
+
+  __twocp_overlay_window_end_index "${total}"
+  local window_end="${REPLY}"
+  if (( __twocp_selection_index < __twocp_overlay_window_start || __twocp_selection_index >= window_end )); then
+    return 1
+  fi
+
+  return 0
+}
+
+function __twocp_clear_prompt_state() {
   :
 }
 
@@ -155,51 +258,166 @@ function __twocp_enable_autosuggestions() {
   __twocp_autosuggest_suppressed=0
 }
 
-function __twocp_restore_postdisplay() {
-  __twocp_clear_highlight
-  if (( __twocp_owns_postdisplay )); then
-    if [[ "${POSTDISPLAY-}" == "${__twocp_rendered_postdisplay}" ]]; then
-      POSTDISPLAY="${__twocp_saved_postdisplay}"
-    fi
-    __twocp_saved_postdisplay=''
-    __twocp_rendered_postdisplay=''
-    __twocp_owns_postdisplay=0
-  fi
+function __twocp_restore_menu_paint() {
+  __twocp_clear_overlay
+  __twocp_deactivate_transient_bindings
+  __twocp_clear_prompt_state
   __twocp_set_status_message ''
   __twocp_enable_autosuggestions
-  __twocp_redraw
 }
 
 function __twocp_invalidate_menu() {
   __twocp_cancel_after_widget_refresh
+  __twocp_restore_menu_paint
   __twocp_reset_state
-  __twocp_restore_postdisplay
 }
 
-function __twocp_render_menu() {
-  if (( ! __twocp_menu_visible )); then
-    __twocp_restore_postdisplay
-    return
+function __twocp_query_suggestions() {
+  if ! __twocp_buffer_has_content; then
+    return 1
   fi
 
-  local total=${#__twocp_displays[@]}
-  local window_start=0
-  if (( __twocp_selection_index >= TWOCP_MAX_ROWS )); then
-    window_start=$(( __twocp_selection_index - TWOCP_MAX_ROWS + 1 ))
+  local response
+  __twocp_debug "refresh:start buffer=${(qqq)BUFFER} cursor=${CURSOR} bin=${TWOCP_BIN}"
+  response="$("${TWOCP_BIN}" suggest \
+    --shell zsh \
+    --buffer "${BUFFER}" \
+    --cursor "${CURSOR}" \
+    --cursor-units chars \
+    --cwd "${PWD}" \
+    --columns "${COLUMNS:-0}" \
+    --rows "${LINES:-0}" \
+    --max-suggestions "${TWOCP_MAX_SUGGESTIONS}" \
+    --format zsh 2>/dev/null)" || {
+      __twocp_debug "refresh:error buffer=${(qqq)BUFFER} cursor=${CURSOR} bin=${TWOCP_BIN}"
+      return 1
+    }
+
+  eval "${response}"
+  __twocp_debug "refresh:done status=${__twocp_status} count=${#__twocp_insert_texts[@]} request=${(qqq)__twocp_request_buffer} cursor=${__twocp_request_cursor}"
+
+  return 0
+}
+
+function __twocp_init_overlay_highlight_mode() {
+  __twocp_overlay_highlight_supported=0
+  __twocp_overlay_highlight_enter=''
+  __twocp_overlay_highlight_exit=''
+
+  if [[ -n "${terminfo[smso]-}" && -n "${terminfo[rmso]-}" ]]; then
+    __twocp_overlay_highlight_supported=1
+    __twocp_overlay_highlight_enter="${terminfo[smso]}"
+    __twocp_overlay_highlight_exit="${terminfo[rmso]}"
+    __twocp_debug "overlay:highlight-mode standout"
+  elif [[ -n "${terminfo[rev]-}" && -n "${terminfo[sgr0]-}" ]]; then
+    __twocp_overlay_highlight_supported=1
+    __twocp_overlay_highlight_enter="${terminfo[rev]}"
+    __twocp_overlay_highlight_exit="${terminfo[sgr0]}"
+    __twocp_debug "overlay:highlight-mode reverse"
+  else
+    __twocp_debug "overlay:highlight-mode marker"
+  fi
+}
+
+function __twocp_overlay_capable() {
+  if (( __twocp_overlay_supported < 0 )); then
+    __twocp_overlay_supported=1
+
+    if [[ "${TERM:-}" == 'dumb' ]]; then
+      __twocp_debug "overlay:term-dumb"
+      __twocp_overlay_supported=0
+      return 1
+    fi
+
+    local capability
+    for capability in sc rc cup el; do
+      if [[ -z "${terminfo[$capability]-}" ]]; then
+        __twocp_debug "overlay:missing-capability ${capability}"
+        __twocp_overlay_supported=0
+        return 1
+      fi
+    done
   fi
 
-  local window_end=$(( window_start + TWOCP_MAX_ROWS ))
-  if (( window_end > total )); then
-    window_end=$total
+  if (( __twocp_overlay_supported == 0 )); then
+    return 1
   fi
 
-  local display_width=0
-  local annotation_budget=0
-  local display_len
+  if (( ! __twocp_overlay_highlight_supported )) \
+    && [[ -z "${__twocp_overlay_highlight_enter}" ]] \
+    && [[ -z "${__twocp_overlay_highlight_exit}" ]]; then
+    __twocp_init_overlay_highlight_mode
+  fi
+
+  return 0
+}
+
+function __twocp_disable_overlay_session() {
+  __twocp_debug "overlay:disable-session"
+  __twocp_overlay_supported=0
+  __twocp_invalidate_menu
+}
+
+function __twocp_query_terminal_cursor() {
+  if ! __twocp_overlay_capable; then
+    return 1
+  fi
+
+  local tty_fd reply='' char='' attempts=0
+
+  exec {tty_fd}<> /dev/tty 2>/dev/null || {
+    __twocp_debug "overlay:tty-open-failed"
+    return 1
+  }
+
+  print -rn -- $'\e[6n' >&${tty_fd}
+  while (( attempts < 32 )); do
+    if ! read -r -u ${tty_fd} -k 1 -t 0.05 char 2>/dev/null; then
+      break
+    fi
+    reply+="${char}"
+    if [[ "${char}" == 'R' ]]; then
+      break
+    fi
+    attempts=$(( attempts + 1 ))
+  done
+
+  exec {tty_fd}<&- 2>/dev/null || true
+  exec {tty_fd}>&- 2>/dev/null || true
+
+  if [[ ! "${reply}" =~ $'^\x1b\\[([0-9]+);([0-9]+)R$' ]]; then
+    __twocp_debug "overlay:cursor-query-failed reply=${(qqq)reply}"
+    return 1
+  fi
+
+  REPLY="${match[1]} ${match[2]}"
+  return 0
+}
+
+function __twocp_overlay_format_rows() {
+  local total=${#__twocp_insert_texts[@]}
   local available_columns=${COLUMNS:-80}
-  local content_budget=$(( available_columns - 6 ))
-  if (( content_budget < 24 )); then
-    content_budget=24
+  local window_start=${__twocp_overlay_window_start}
+  local window_end=0
+  local display_width=0
+  local display_len
+  local annotation_budget=0
+  local prefix_width=2
+  local content_budget=0
+  local row_budget=0
+  local index display annotation display_row prefix selected
+
+  REPLY=''
+  if (( total == 0 || available_columns <= 0 )); then
+    return 1
+  fi
+
+  __twocp_overlay_window_end_index "${total}"
+  window_end="${REPLY}"
+
+  content_budget=$(( available_columns - prefix_width ))
+  if (( content_budget < 16 )); then
+    content_budget=16
   fi
 
   for (( index = window_start + 1; index <= window_end; index += 1 )); do
@@ -215,33 +433,33 @@ function __twocp_render_menu() {
   if (( display_width < 8 )); then
     display_width=8
   fi
+
   annotation_budget=$(( content_budget - display_width - 3 ))
   if (( annotation_budget < 0 )); then
     annotation_budget=0
   fi
 
-  local -a lines=()
-  local index display annotation padded_display row selected prefix
+  local -a rows=()
   for (( index = window_start + 1; index <= window_end; index += 1 )); do
+    display="${__twocp_displays[index]}"
+    annotation="${__twocp_annotations[index]}"
     selected=0
+
     if (( index - 1 == __twocp_selection_index )); then
       selected=1
     fi
 
-    display="${__twocp_displays[index]}"
-    annotation="${__twocp_annotations[index]}"
-    if (( ${#display} > display_width )); then
-      if (( display_width > 3 )); then
-        display="${display[1,$(( display_width - 3 ))]}..."
-      fi
+    if (( ${#display} > display_width )) && (( display_width > 3 )); then
+      display="${display[1,$(( display_width - 3 ))]}..."
+    fi
+    display="${(r:display_width:: :)display}"
+
+    if (( selected )) && (( ! __twocp_overlay_highlight_supported )); then
+      prefix='> '
+    else
+      prefix='  '
     fi
 
-    padded_display="${(r:display_width:: :)display}"
-    prefix='[ ] '
-    if (( selected )); then
-      prefix='[>] '
-    fi
-    suffix=''
     if [[ -n "${annotation}" ]] && (( annotation_budget > 0 )); then
       if (( ${#annotation} > annotation_budget )); then
         if (( annotation_budget > 3 )); then
@@ -250,103 +468,169 @@ function __twocp_render_menu() {
           annotation=''
         fi
       fi
-      if [[ -n "${annotation}" ]]; then
-        row="${prefix}${padded_display} | ${annotation}"
-      else
-        row="${prefix}${padded_display}"
-      fi
     else
-      row="${prefix}${padded_display}"
+      annotation=''
     fi
 
-    lines+=("${row}")
+    if [[ -n "${annotation}" ]]; then
+      display_row="${prefix}${display} | ${annotation}"
+    else
+      display_row="${prefix}${display}"
+    fi
+
+    row_budget=${available_columns}
+    if (( ${#display_row} > row_budget )) && (( row_budget > 3 )); then
+      display_row="${display_row[1,$(( row_budget - 3 ))]}..."
+    fi
+    rows+=("${display_row}")
   done
 
-  __twocp_disable_autosuggestions
-  __twocp_take_postdisplay
-  __twocp_rendered_postdisplay=$'\n'"${(F)lines}"
-  POSTDISPLAY="${__twocp_rendered_postdisplay}"
-  if (( total > 0 )); then
-    local selected_display="${__twocp_displays[$(( __twocp_selection_index + 1 ))]}"
-    __twocp_set_status_message "2cp [$(( __twocp_selection_index + 1 ))/${total}]: ${selected_display}"
-  else
-    __twocp_set_status_message ''
+  REPLY="${(pj:\n:)rows}"
+  return 0
+}
+
+function __twocp_clear_overlay() {
+  if (( __twocp_rendered_row_count == 0 || __twocp_overlay_origin_row <= 0 )); then
+    return 0
   fi
-  __twocp_clear_highlight
-  __twocp_redraw
+
+  if ! __twocp_overlay_capable; then
+    __twocp_overlay_origin_row=0
+    __twocp_rendered_row_count=0
+    __twocp_skip_next_pre_redraw_clear=0
+    return 0
+  fi
+
+  local tty_fd row=0
+  exec {tty_fd}> /dev/tty 2>/dev/null || {
+    __twocp_overlay_origin_row=0
+    __twocp_rendered_row_count=0
+    __twocp_skip_next_pre_redraw_clear=0
+    return 0
+  }
+
+  print -rn -- "${terminfo[sc]}" >&${tty_fd}
+  for (( row = 0; row < __twocp_rendered_row_count; row += 1 )); do
+    echoti cup $(( __twocp_overlay_origin_row - 1 + row )) 0 >&${tty_fd}
+    print -rn -- "${terminfo[el]}" >&${tty_fd}
+  done
+  print -rn -- "${terminfo[rc]}" >&${tty_fd}
+
+  exec {tty_fd}>&- 2>/dev/null || true
+  __twocp_overlay_origin_row=0
+  __twocp_rendered_row_count=0
+  __twocp_skip_next_pre_redraw_clear=0
+}
+
+function __twocp_render_overlay() {
+  if ! __twocp_overlay_capable; then
+    return 1
+  fi
+
+  if ! __twocp_menu_state_valid; then
+    return 1
+  fi
+
+  if ! __twocp_overlay_format_rows; then
+    return 1
+  fi
+
+  local rows="${REPLY}"
+  local -a formatted_rows=("${(@f)rows}")
+  if (( ${#formatted_rows[@]} == 0 )); then
+    return 1
+  fi
+
+  local window_start=${__twocp_overlay_window_start}
+
+  if ! __twocp_query_terminal_cursor; then
+    return 1
+  fi
+
+  local cursor_row cursor_col
+  cursor_row=${${=REPLY}[1]}
+  cursor_col=${${=REPLY}[2]}
+
+  local columns=${COLUMNS:-80}
+  if (( columns <= 0 )); then
+    return 1
+  fi
+
+  local remainder_chars=$(( ${#BUFFER} - CURSOR ))
+  if (( remainder_chars < 0 )); then
+    remainder_chars=0
+  fi
+
+  local rows_to_buffer_end=$(( (cursor_col - 1 + remainder_chars) / columns ))
+  local overlay_row=$(( cursor_row + rows_to_buffer_end + 1 ))
+  local tty_fd row_index=1 row_text=''
+
+  __twocp_clear_overlay
+
+  exec {tty_fd}> /dev/tty 2>/dev/null || return 1
+  print -rn -- "${terminfo[sc]}" >&${tty_fd}
+  for (( row_index = 1; row_index <= ${#formatted_rows[@]}; row_index += 1 )); do
+    row_text="${formatted_rows[row_index]}"
+    echoti cup $(( overlay_row - 1 + row_index - 1 )) 0 >&${tty_fd}
+    print -rn -- "${terminfo[el]}" >&${tty_fd}
+    if (( __twocp_overlay_highlight_supported )) && (( window_start + row_index - 1 == __twocp_selection_index )); then
+      print -rn -- "${__twocp_overlay_highlight_enter}${row_text}${__twocp_overlay_highlight_exit}" >&${tty_fd}
+    else
+      print -rn -- "${row_text}" >&${tty_fd}
+    fi
+  done
+  print -rn -- "${terminfo[rc]}" >&${tty_fd}
+  exec {tty_fd}>&- 2>/dev/null || true
+
+  __twocp_overlay_origin_row=${overlay_row}
+  __twocp_rendered_row_count=${#formatted_rows[@]}
+  __twocp_skip_next_pre_redraw_clear=1
+  __twocp_debug "overlay:render rows=${__twocp_rendered_row_count} origin=${__twocp_overlay_origin_row} selection=${__twocp_selection_index} highlight=${__twocp_overlay_highlight_supported}"
+  return 0
 }
 
 function __twocp_refresh_now() {
   __twocp_cancel_after_widget_refresh
 
-  local response
-  __twocp_debug "refresh:start buffer=${(qqq)BUFFER} cursor=${CURSOR} bin=${TWOCP_BIN}"
-  response="$("${TWOCP_BIN}" suggest \
-    --shell zsh \
-    --buffer "${BUFFER}" \
-    --cursor "${CURSOR}" \
-    --cursor-units chars \
-    --cwd "${PWD}" \
-    --columns "${COLUMNS:-0}" \
-    --rows "${LINES:-0}" \
-    --max-suggestions "${TWOCP_MAX_SUGGESTIONS}" \
-    --format zsh 2>/dev/null)" || {
-      __twocp_debug "refresh:error buffer=${(qqq)BUFFER} cursor=${CURSOR} bin=${TWOCP_BIN}"
-      __twocp_invalidate_menu
-      return
-    }
-
-  eval "${response}"
-  __twocp_debug "refresh:done status=${__twocp_status} count=${#__twocp_insert_texts[@]} request=${(qqq)__twocp_request_buffer} cursor=${__twocp_request_cursor}"
-
-  if (( ${#__twocp_insert_texts[@]} == 0 )); then
-    __twocp_menu_visible=0
-    __twocp_restore_postdisplay
+  if ! __twocp_query_suggestions; then
+    __twocp_invalidate_menu
     return
   fi
 
-  __twocp_menu_visible=1
-  if (( __twocp_selection_index >= ${#__twocp_insert_texts[@]} )); then
-    __twocp_selection_index=0
+  if ! __twocp_begin_menu_refresh; then
+    __twocp_invalidate_menu
+    return
   fi
-  __twocp_render_menu
+
+  if ! __twocp_overlay_capable; then
+    __twocp_disable_overlay_session
+    return
+  fi
+
+  __twocp_activate_transient_bindings
+  __twocp_disable_autosuggestions
+  if ! __twocp_render_overlay; then
+    __twocp_disable_overlay_session
+    return
+  fi
 }
 
 function __twocp_after_widget_ready() {
   local fd="$1"
   local discard=''
 
-  __twocp_debug "after-widget:ready action=${__twocp_after_widget_action:-refresh} buffer=${(qqq)BUFFER} cursor=${CURSOR}"
+  __twocp_debug "after-widget:ready buffer=${(qqq)BUFFER} cursor=${CURSOR}"
   zle -F "${fd}" 2>/dev/null || true
   read -r -u "${fd}" -k 1 discard 2>/dev/null || true
   exec {fd}<&- 2>/dev/null || true
   __twocp_after_widget_fd=-1
   __twocp_after_widget_pid=''
-  local action="${__twocp_after_widget_action:-refresh}"
-  __twocp_after_widget_action=''
-  if [[ "${action}" == 'render' ]]; then
-    __twocp_render_menu
-  else
-    __twocp_refresh_now
-  fi
+  __twocp_refresh_now
 }
 
 function __twocp_schedule_after_widget_refresh() {
   __twocp_debug "after-widget:schedule-refresh buffer=${(qqq)BUFFER} cursor=${CURSOR}"
   __twocp_cancel_after_widget_refresh
-  __twocp_after_widget_action='refresh'
-  exec {__twocp_after_widget_fd}< <(
-    sleep 0.01
-    print -r -- .
-  )
-  __twocp_after_widget_pid=$!
-  zle -F -w "${__twocp_after_widget_fd}" __twocp-after-widget-ready
-}
-
-function __twocp_schedule_after_widget_render() {
-  __twocp_debug "after-widget:schedule-render buffer=${(qqq)BUFFER} cursor=${CURSOR}"
-  __twocp_cancel_after_widget_refresh
-  __twocp_after_widget_action='render'
   exec {__twocp_after_widget_fd}< <(
     sleep 0.01
     print -r -- .
@@ -373,6 +657,10 @@ function __twocp_apply_selection() {
     return 1
   fi
 
+  if (( __twocp_selection_index < 0 || __twocp_selection_index >= ${#__twocp_insert_texts[@]} )); then
+    return 1
+  fi
+
   local selection=$(( __twocp_selection_index + 1 ))
   local insert_text="${__twocp_insert_texts[selection]}"
   local prefix=''
@@ -389,7 +677,6 @@ function __twocp_apply_selection() {
   if __twocp_should_auto_refresh_after_space; then
     __twocp_schedule_after_widget_refresh
   fi
-  __twocp_redisplay
   return 0
 }
 
@@ -398,25 +685,15 @@ function __twocp_enter_should_accept_selection() {
     return 1
   fi
 
-  if (( ${#__twocp_insert_texts[@]} == 0 )); then
-    __twocp_invalidate_menu
+  if (( __twocp_rendered_row_count == 0 )); then
     return 1
   fi
 
-  local selection=$(( __twocp_selection_index + 1 ))
-  local insert_text="${__twocp_insert_texts[selection]}"
-  local current_fragment=''
-  local insert_without_space="${insert_text% }"
-
-  if (( __twocp_replace_end > __twocp_replace_start )); then
-    current_fragment="${BUFFER[$(( __twocp_replace_start + 1 )),__twocp_replace_end]}"
+  if (( __twocp_selection_index < 0 || __twocp_selection_index >= ${#__twocp_insert_texts[@]} )); then
+    return 1
   fi
 
-  if [[ -z "${current_fragment}" ]]; then
-    return 0
-  fi
-
-  if [[ "${insert_without_space}" == "${current_fragment}" ]]; then
+  if (( __twocp_replace_start == __twocp_replace_end )) && (( ! __twocp_selection_touched )); then
     return 1
   fi
 
@@ -424,7 +701,7 @@ function __twocp_enter_should_accept_selection() {
 }
 
 function twocp_show_or_refresh() {
-  __twocp_schedule_after_widget_refresh
+  __twocp_refresh_now
 }
 
 function twocp_accept_suggestion() {
@@ -445,17 +722,19 @@ function twocp_dismiss_suggestions() {
   __twocp_invalidate_menu
 }
 
+function twocp_interrupt_or_original() {
+  __twocp_invalidate_menu
+  __twocp_call_saved_widget "${KEYS}"
+}
+
 function twocp_next_suggestion() {
   if ! __twocp_menu_current; then
     return 0
   fi
 
-  __twocp_debug "menu:next widget=${WIDGET:-} keys=${(qqq)KEYS} selection=${__twocp_selection_index} count=${#__twocp_insert_texts[@]}"
   __twocp_cancel_after_widget_refresh
-  if (( __twocp_selection_index + 1 < ${#__twocp_insert_texts[@]} )); then
-    __twocp_selection_index=$(( __twocp_selection_index + 1 ))
-    __twocp_schedule_after_widget_render
-  fi
+  __twocp_move_selection_down || return 0
+  __twocp_render_overlay || __twocp_disable_overlay_session
 }
 
 function twocp_previous_suggestion() {
@@ -463,16 +742,14 @@ function twocp_previous_suggestion() {
     return 0
   fi
 
-  __twocp_debug "menu:previous widget=${WIDGET:-} keys=${(qqq)KEYS} selection=${__twocp_selection_index} count=${#__twocp_insert_texts[@]}"
   __twocp_cancel_after_widget_refresh
-  if (( __twocp_selection_index > 0 )); then
-    __twocp_selection_index=$(( __twocp_selection_index - 1 ))
-    __twocp_schedule_after_widget_render
-  fi
+  __twocp_move_selection_up || return 0
+  __twocp_render_overlay || __twocp_disable_overlay_session
 }
 
 function __twocp_call_saved_widget() {
   local key="$1"
+  local preserve_menu="${2:-0}"
   local keymap="${KEYMAP:-main}"
   local managed_widget="${WIDGET:-}"
   local binding_id="$(__twocp_binding_id "${keymap}" "${key}")"
@@ -482,10 +759,13 @@ function __twocp_call_saved_widget() {
   local widget_saved="${__twocp_saved_widgets_by_widget[$widget_binding_id]-}"
   local widget_saved_alias="${__twocp_saved_widget_aliases_by_widget[$widget_binding_id]-}"
   local use_alias=1
+  local had_menu=${__twocp_menu_visible}
 
   __twocp_debug "saved-widget:start widget=${managed_widget} keymap=${keymap} key=${(qqq)key} saved=${saved} alias=${saved_alias} widget_saved=${widget_saved} widget_alias=${widget_saved_alias} buffer=${(qqq)BUFFER}"
   __twocp_cancel_after_widget_refresh
-  __twocp_invalidate_menu
+  if (( had_menu )) && (( ! preserve_menu )); then
+    __twocp_invalidate_menu
+  fi
   if [[ "${managed_widget}" == 'twocp-up-or-original' || "${managed_widget}" == 'twocp-down-or-original' ]]; then
     use_alias=0
   fi
@@ -510,14 +790,6 @@ function __twocp_call_saved_widget() {
   zle "${saved}"
 }
 
-function __twocp_call_saved_self_insert() {
-  if (( __twocp_self_insert_saved )); then
-    zle "${__twocp_self_insert_alias}" 2>/dev/null && return 0
-  fi
-
-  zle .self-insert
-}
-
 function __twocp_normalize_fallback_widget() {
   local managed_widget="$1"
   local saved_widget="$2"
@@ -539,13 +811,25 @@ function __twocp_normalize_fallback_widget() {
           ;;
       esac
       ;;
+    twocp-space-maybe-show)
+      print -r -- self-insert
+      return 0
+      ;;
+    twocp-backspace-or-original)
+      print -r -- backward-delete-char
+      return 0
+      ;;
+    twocp-interrupt-or-original)
+      print -r -- send-break
+      return 0
+      ;;
   esac
 
   print -r -- "${saved_widget}"
 }
 
 function twocp_down_or_original() {
-  if __twocp_menu_current; then
+  if (( __twocp_menu_visible )); then
     twocp_next_suggestion
     return 0
   fi
@@ -554,7 +838,7 @@ function twocp_down_or_original() {
 }
 
 function twocp_up_or_original() {
-  if __twocp_menu_current; then
+  if (( __twocp_menu_visible )); then
     twocp_previous_suggestion
     return 0
   fi
@@ -593,35 +877,140 @@ function __twocp_should_auto_refresh_after_space() {
   __twocp_supported_auto_root "${tokens[1]}"
 }
 
+function __twocp_call_saved_self_insert() {
+  if (( __twocp_self_insert_saved )); then
+    zle "${__twocp_self_insert_alias}" 2>/dev/null && return 0
+  fi
+
+  zle .self-insert
+}
+
 function twocp_self_insert() {
+  __twocp_cancel_after_widget_refresh
   __twocp_call_saved_self_insert
-  __twocp_debug "self-insert keys=${(qqq)KEYS} buffer=${(qqq)BUFFER} cursor=${CURSOR} visible=${__twocp_menu_visible}"
   if __twocp_should_auto_refresh_after_space; then
-    __twocp_debug "self-insert:auto-root"
     __twocp_schedule_after_widget_refresh
   elif (( __twocp_menu_visible )); then
-    __twocp_debug "self-insert:refresh-visible"
     __twocp_schedule_after_widget_refresh
   fi
 }
 
 function twocp_space_maybe_show() {
-  __twocp_debug "space:start keys=${(qqq)KEYS} keymap=${KEYMAP:-} buffer=${(qqq)BUFFER} cursor=${CURSOR}"
-  __twocp_call_saved_widget "${KEYS}"
-  __twocp_debug "space buffer=${(qqq)BUFFER} cursor=${CURSOR} visible=${__twocp_menu_visible}"
+  __twocp_call_saved_widget "${KEYS}" 1
   if __twocp_should_auto_refresh_after_space; then
-    __twocp_debug "space:auto-root"
     __twocp_schedule_after_widget_refresh
   elif (( __twocp_menu_visible )); then
-    __twocp_debug "space:refresh-visible"
     __twocp_schedule_after_widget_refresh
   fi
 }
 
+function twocp_backspace_or_original() {
+  local was_visible=${__twocp_menu_visible}
+
+  __twocp_call_saved_widget "${KEYS}" 1
+
+  if (( was_visible )); then
+    if ! __twocp_buffer_has_content; then
+      __twocp_invalidate_menu
+    else
+      __twocp_schedule_after_widget_refresh
+    fi
+  fi
+}
+
+function __twocp_activate_transient_bindings() {
+  if (( __twocp_transient_bindings_active )); then
+    return 0
+  fi
+
+  zle -A self-insert "${__twocp_self_insert_alias}"
+  zle -N self-insert twocp_self_insert
+  __twocp_self_insert_saved=1
+  __twocp_bind_widget "${TWOCP_KEY_ENTER}" twocp-accept-or-original
+  __twocp_bind_widget "${TWOCP_KEY_ENTER_ALT}" twocp-accept-or-original
+  __twocp_bind_widget "${TWOCP_KEY_ESCAPE}" twocp-dismiss-suggestions
+  __twocp_bind_widget "${TWOCP_KEY_DOWN}" twocp-down-or-original
+  __twocp_bind_widget "${TWOCP_KEY_UP}" twocp-up-or-original
+  __twocp_bind_widget "${TWOCP_KEY_DOWN_ALT}" twocp-down-or-original
+  __twocp_bind_widget "${TWOCP_KEY_UP_ALT}" twocp-up-or-original
+  __twocp_bind_widget "${TWOCP_KEY_BACKSPACE}" twocp-backspace-or-original
+  __twocp_bind_widget "${TWOCP_KEY_BACKSPACE_ALT}" twocp-backspace-or-original
+  __twocp_bind_widget "${TWOCP_KEY_INTERRUPT}" twocp-interrupt-or-original
+  if [[ -n "${terminfo[kcud1]-}" ]]; then
+    __twocp_bind_widget "${terminfo[kcud1]}" twocp-down-or-original
+  fi
+  if [[ -n "${terminfo[kcuu1]-}" ]]; then
+    __twocp_bind_widget "${terminfo[kcuu1]}" twocp-up-or-original
+  fi
+  if [[ -n "${terminfo[kbs]-}" ]]; then
+    __twocp_bind_widget "${terminfo[kbs]}" twocp-backspace-or-original
+  fi
+  __twocp_transient_bindings_active=1
+}
+
+function __twocp_deactivate_transient_bindings() {
+  if (( ! __twocp_transient_bindings_active )); then
+    return 0
+  fi
+
+  __twocp_restore_binding "${TWOCP_KEY_ENTER}"
+  __twocp_restore_binding "${TWOCP_KEY_ENTER_ALT}"
+  __twocp_restore_binding "${TWOCP_KEY_ESCAPE}"
+  __twocp_restore_binding "${TWOCP_KEY_DOWN}"
+  __twocp_restore_binding "${TWOCP_KEY_UP}"
+  __twocp_restore_binding "${TWOCP_KEY_DOWN_ALT}"
+  __twocp_restore_binding "${TWOCP_KEY_UP_ALT}"
+  __twocp_restore_binding "${TWOCP_KEY_BACKSPACE}"
+  __twocp_restore_binding "${TWOCP_KEY_BACKSPACE_ALT}"
+  __twocp_restore_binding "${TWOCP_KEY_INTERRUPT}"
+  if [[ -n "${terminfo[kcud1]-}" ]]; then
+    __twocp_restore_binding "${terminfo[kcud1]}"
+  fi
+  if [[ -n "${terminfo[kcuu1]-}" ]]; then
+    __twocp_restore_binding "${terminfo[kcuu1]}"
+  fi
+  if [[ -n "${terminfo[kbs]-}" ]]; then
+    __twocp_restore_binding "${terminfo[kbs]}"
+  fi
+  if (( __twocp_self_insert_saved )); then
+    zle -A "${__twocp_self_insert_alias}" self-insert
+    __twocp_self_insert_saved=0
+  fi
+  __twocp_transient_bindings_active=0
+}
+
 function __twocp_precmd_clear() {
   __twocp_cancel_after_widget_refresh
+  __twocp_restore_menu_paint
   __twocp_reset_state
-  __twocp_restore_postdisplay
+}
+
+function __twocp_line_init_cleanup() {
+  __twocp_clear_prompt_state
+  __twocp_set_status_message ''
+  __twocp_enable_autosuggestions
+}
+
+function __twocp_line_pre_redraw_cleanup() {
+  if (( __twocp_skip_next_pre_redraw_clear )); then
+    __twocp_skip_next_pre_redraw_clear=0
+    __twocp_debug "overlay:skip-pre-redraw-clear"
+    return 0
+  fi
+
+  if (( __twocp_menu_visible )) && (( __twocp_after_widget_fd >= 0 )); then
+    __twocp_debug "overlay:skip-pre-redraw-clear-pending-refresh"
+    return 0
+  fi
+
+  __twocp_debug "overlay:pre-redraw-clear visible=${__twocp_menu_visible} rows=${__twocp_rendered_row_count}"
+  __twocp_clear_overlay
+}
+
+function __twocp_line_finish_cleanup() {
+  __twocp_cancel_after_widget_refresh
+  __twocp_restore_menu_paint
+  __twocp_reset_state
 }
 
 function __twocp_widget_for_key() {
@@ -691,14 +1080,14 @@ function __twocp_default_widget_for_managed_widget() {
     twocp-accept-or-original)
       print -r -- accept-line
       ;;
+    twocp-interrupt-or-original)
+      print -r -- send-break
+      ;;
     twocp-down-or-original)
       print -r -- down-line-or-history
       ;;
     twocp-up-or-original)
       print -r -- up-line-or-history
-      ;;
-    twocp-space-maybe-show)
-      print -r -- self-insert
       ;;
     *)
       return 1
@@ -832,37 +1221,25 @@ function twocp_zsh_enable() {
   zle -N twocp-accept-suggestion twocp_accept_suggestion
   zle -N twocp-accept-or-original twocp_accept_or_original
   zle -N twocp-dismiss-suggestions twocp_dismiss_suggestions
+  zle -N twocp-interrupt-or-original twocp_interrupt_or_original
   zle -N twocp-next-suggestion twocp_next_suggestion
   zle -N twocp-previous-suggestion twocp_previous_suggestion
   zle -N twocp-down-or-original twocp_down_or_original
   zle -N twocp-up-or-original twocp_up_or_original
   zle -N twocp-space-maybe-show twocp_space_maybe_show
+  zle -N twocp-backspace-or-original twocp_backspace_or_original
+  zle -N twocp-self-insert twocp_self_insert
   zle -N __twocp-after-widget-ready __twocp_after_widget_ready
-  zle -A self-insert "${__twocp_self_insert_alias}"
-  zle -N self-insert twocp_self_insert
-  __twocp_self_insert_saved=1
+  zle -N __twocp-line-pre-redraw-cleanup __twocp_line_pre_redraw_cleanup
+  zle -N __twocp-line-finish-cleanup __twocp_line_finish_cleanup
 
   __twocp_bind_widget "${TWOCP_KEY_SHOW}" twocp-show-or-refresh
-  __twocp_bind_widget "${TWOCP_KEY_ACCEPT}" twocp-accept-suggestion
-  __twocp_bind_widget "${TWOCP_KEY_ENTER}" twocp-accept-or-original
-  __twocp_bind_widget "${TWOCP_KEY_ENTER_ALT}" twocp-accept-or-original
-  __twocp_bind_widget "${TWOCP_KEY_DISMISS}" twocp-dismiss-suggestions
-  __twocp_bind_widget "${TWOCP_KEY_NEXT}" twocp-next-suggestion
-  __twocp_bind_widget "${TWOCP_KEY_PREVIOUS}" twocp-previous-suggestion
-  __twocp_bind_widget "${TWOCP_KEY_DOWN}" twocp-down-or-original
-  __twocp_bind_widget "${TWOCP_KEY_UP}" twocp-up-or-original
-  __twocp_bind_widget "${TWOCP_KEY_DOWN_ALT}" twocp-down-or-original
-  __twocp_bind_widget "${TWOCP_KEY_UP_ALT}" twocp-up-or-original
-  if [[ -n "${terminfo[kcud1]-}" ]]; then
-    __twocp_bind_widget "${terminfo[kcud1]}" twocp-down-or-original
-  fi
-  if [[ -n "${terminfo[kcuu1]-}" ]]; then
-    __twocp_bind_widget "${terminfo[kcuu1]}" twocp-up-or-original
-  fi
   __twocp_bind_widget ' ' twocp-space-maybe-show
 
   add-zsh-hook precmd __twocp_precmd_clear
   add-zsh-hook preexec __twocp_precmd_clear
+  add-zle-hook-widget line-pre-redraw __twocp-line-pre-redraw-cleanup
+  add-zle-hook-widget line-finish __twocp-line-finish-cleanup
 
   __twocp_enabled=1
 }
@@ -873,32 +1250,14 @@ function twocp_zsh_disable() {
   fi
 
   __twocp_restore_binding "${TWOCP_KEY_SHOW}"
-  __twocp_restore_binding "${TWOCP_KEY_ACCEPT}"
-  __twocp_restore_binding "${TWOCP_KEY_ENTER}"
-  __twocp_restore_binding "${TWOCP_KEY_ENTER_ALT}"
-  __twocp_restore_binding "${TWOCP_KEY_DISMISS}"
-  __twocp_restore_binding "${TWOCP_KEY_NEXT}"
-  __twocp_restore_binding "${TWOCP_KEY_PREVIOUS}"
-  __twocp_restore_binding "${TWOCP_KEY_DOWN}"
-  __twocp_restore_binding "${TWOCP_KEY_UP}"
-  __twocp_restore_binding "${TWOCP_KEY_DOWN_ALT}"
-  __twocp_restore_binding "${TWOCP_KEY_UP_ALT}"
-  if [[ -n "${terminfo[kcud1]-}" ]]; then
-    __twocp_restore_binding "${terminfo[kcud1]}"
-  fi
-  if [[ -n "${terminfo[kcuu1]-}" ]]; then
-    __twocp_restore_binding "${terminfo[kcuu1]}"
-  fi
   __twocp_restore_binding ' '
-
-  if (( __twocp_self_insert_saved )); then
-    zle -A "${__twocp_self_insert_alias}" self-insert
-    __twocp_self_insert_saved=0
-  fi
 
   add-zsh-hook -d precmd __twocp_precmd_clear 2>/dev/null
   add-zsh-hook -d preexec __twocp_precmd_clear 2>/dev/null
+  add-zle-hook-widget -d line-pre-redraw __twocp-line-pre-redraw-cleanup 2>/dev/null
+  add-zle-hook-widget -d line-finish __twocp-line-finish-cleanup 2>/dev/null
 
+  __twocp_deactivate_transient_bindings
   __twocp_invalidate_menu
   __twocp_enabled=0
 }
