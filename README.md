@@ -6,7 +6,7 @@ The immediate target is a local installable tool that helps users discover and c
 
 ## Current Status
 
-Phase 4 is implemented as a multi-CLI built-in prototype with the first interactive `zsh` path and targeted bounded dynamic lookup. The workspace now includes the Phase 1 Rust-side foundation, a suggestion engine for built-in `git` and `kubectl`, a shell-facing `twocp suggest` command, a thin `zsh` bridge with a zsh-owned 5-row overlay renderer driven by shell-managed selection state, and live provider-owned lookup paths for git branches plus high-value kubectl resource names, namespaces, and contexts with explicit cache and degraded-mode behavior.
+Phase 5A is implemented on top of the multi-CLI built-in prototype. The workspace now includes the Phase 1 Rust-side foundation, a suggestion engine for built-in `git` and `kubectl`, shell-facing `twocp suggest`, `install`, `uninstall`, `print-shell-hook`, and `doctor` commands, a thin `zsh` bridge with a zsh-owned 5-row overlay renderer driven by shell-managed selection state, and live provider-owned lookup paths for git branches plus high-value kubectl resource names, namespaces, and contexts with explicit cache and degraded-mode behavior.
 
 The current interactive path remains intentionally narrow:
 
@@ -48,11 +48,56 @@ cargo check --workspace
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 zsh shell/zsh/twocp_state_test.zsh
+cargo run -p twocp-cli -- doctor --shell zsh
 ```
 
 ## Next Development Step
 
-Build Phase 5: harden packaging, doctor/debug flows, shell install and uninstall paths, and broader failure recovery around the existing `zsh` bridge and provider runtime.
+Finish the rest of Phase 5B after the debug CLI surface: harden release packaging, then start the external provider install and discovery flow on top of the provider-root index.
+
+## Install And Doctor
+
+Install the current `zsh` integration into the default config path and managed `~/.zshrc` block:
+
+```bash
+cargo run -p twocp-cli -- install --shell zsh
+```
+
+Print the managed shell snippet without editing files:
+
+```bash
+cargo run -p twocp-cli -- print-shell-hook --shell zsh
+```
+
+Inspect the current install state and a static `git ` sanity check:
+
+```bash
+cargo run -p twocp-cli -- doctor --shell zsh
+```
+
+Inspect the normalized request, provider selection, parser state, timings, replacement range, and top suggestions for a single suggest call:
+
+```bash
+cargo run -p twocp-cli -- debug request --buffer 'git ' --cursor 4 --cwd . --format text
+```
+
+Inspect the compact render model that the `zsh` bridge would paint:
+
+```bash
+cargo run -p twocp-cli -- debug render --buffer 'git ' --cursor 4 --cwd . --max-suggestions 5
+```
+
+Inspect built-in provider metadata from the current root index and catalog:
+
+```bash
+cargo run -p twocp-cli -- debug provider git --format json
+```
+
+Remove the managed shell block and installed hook file:
+
+```bash
+cargo run -p twocp-cli -- uninstall --shell zsh
+```
 
 ## Zsh Prototype
 
@@ -101,8 +146,8 @@ and `^J`, and can be overridden with `TWOCP_KEY_ENTER` and
 
 The repo-local shell regression harness lives at `shell/zsh/twocp_state_test.zsh`.
 It exercises show and typed-refresh state, scroll-window movement, clamping, and
-clean invalidation directly against the internal zsh helpers. It does not try to
-assert terminal cursor painting.
+clean invalidation directly against the internal zsh helpers, including the
+missing-binary degraded path. It does not try to assert terminal cursor painting.
 
 Manual terminal verification for the current overlay contract should record:
 

@@ -305,11 +305,20 @@ function test_invalidation_resets_overlay_state() {
   assert_equal "${__twocp_overlay_highlight_exit}" '' 'no-match highlight exit'
 }
 
+function test_missing_binary_degrades_cleanly() {
+  reset_test_state
+
+  TWOCP_BIN='/definitely/missing/twocp'
+  assert_false __twocp_runtime_available
+  TWOCP_BIN='twocp'
+}
+
 test_initial_show_and_typed_refresh
 test_scroll_down_and_clamp_bottom
 test_scroll_up_from_bottom
 test_backspace_refresh_resets_selection
 test_enter_accept_requires_fragment_or_explicit_selection
 test_invalidation_resets_overlay_state
+test_missing_binary_degrades_cleanly
 
 print -- 'twocp zsh bridge state tests passed'

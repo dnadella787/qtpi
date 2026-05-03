@@ -93,6 +93,22 @@ function __twocp_debug() {
   fi
 }
 
+function __twocp_runtime_available() {
+  if [[ "${TWOCP_BIN}" == */* ]]; then
+    if [[ ! -x "${TWOCP_BIN}" ]]; then
+      __twocp_debug "runtime:missing-explicit-bin bin=${TWOCP_BIN}"
+      return 1
+    fi
+  else
+    if ! whence -p "${TWOCP_BIN}" >/dev/null 2>&1; then
+      __twocp_debug "runtime:missing-bin bin=${TWOCP_BIN}"
+      return 1
+    fi
+  fi
+
+  return 0
+}
+
 function __twocp_cancel_after_widget_refresh() {
   if (( __twocp_after_widget_fd >= 0 )); then
     zle -F "${__twocp_after_widget_fd}" 2>/dev/null || true
@@ -277,6 +293,11 @@ function __twocp_query_suggestions() {
     return 1
   fi
 
+  if ! __twocp_runtime_available; then
+    __twocp_reset_state
+    return 1
+  fi
+
   local response
   __twocp_debug "refresh:start buffer=${(qqq)BUFFER} cursor=${CURSOR} bin=${TWOCP_BIN}"
   response="$("${TWOCP_BIN}" suggest \
@@ -290,10 +311,30 @@ function __twocp_query_suggestions() {
     --max-suggestions "${TWOCP_MAX_SUGGESTIONS}" \
     --format zsh 2>/dev/null)" || {
       __twocp_debug "refresh:error buffer=${(qqq)BUFFER} cursor=${CURSOR} bin=${TWOCP_BIN}"
+      __twocp_reset_state
       return 1
     }
 
-  eval "${response}"
+  if [[ -z "${response}" ]]; then
+    __twocp_debug "refresh:empty-response"
+    __twocp_reset_state
+    return 1
+  fi
+
+  if ! eval "${response}"; then
+    __twocp_debug "refresh:eval-error"
+    __twocp_reset_state
+    return 1
+  fi
+
+  if (( ${#__twocp_insert_texts[@]} != ${#__twocp_displays[@]} )) \
+    || (( ${#__twocp_insert_texts[@]} != ${#__twocp_annotations[@]} )) \
+    || (( ${#__twocp_insert_texts[@]} != ${#__twocp_kinds[@]} )); then
+    __twocp_debug "refresh:malformed-response count=${#__twocp_insert_texts[@]} displays=${#__twocp_displays[@]} annotations=${#__twocp_annotations[@]} kinds=${#__twocp_kinds[@]}"
+    __twocp_reset_state
+    return 1
+  fi
+
   __twocp_debug "refresh:done status=${__twocp_status} count=${#__twocp_insert_texts[@]} request=${(qqq)__twocp_request_buffer} cursor=${__twocp_request_cursor}"
 
   return 0
