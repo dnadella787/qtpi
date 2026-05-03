@@ -8,11 +8,13 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use anyhow::{Context, Result, anyhow, bail};
 use serde::Serialize;
 
-const START_MARKER: &str = "# >>> 2cp >>>";
-const END_MARKER: &str = "# <<< 2cp <<<";
+const START_MARKER: &str = "# >>> qtpi >>>";
+const END_MARKER: &str = "# <<< qtpi <<<";
+const LEGACY_START_MARKER: &str = "# >>> 2cp >>>";
+const LEGACY_END_MARKER: &str = "# <<< 2cp <<<";
 const EMBEDDED_ZSH_HOOK: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../shell/zsh/twocp.zsh"
+    "/../../shell/zsh/qtpi.zsh"
 ));
 
 #[derive(Clone, Debug)]
@@ -68,7 +70,7 @@ pub fn resolve_install_paths(overrides: &PathOverrides) -> Result<InstallPaths> 
         .hook_path
         .as_ref()
         .map(|path| expand_tilde(path, &home_dir))
-        .unwrap_or_else(|| config_dir.join("2cp").join("zsh").join("twocp.zsh"));
+        .unwrap_or_else(|| config_dir.join("qtpi").join("zsh").join("qtpi.zsh"));
     let rc_file = overrides
         .rc_file
         .as_ref()
@@ -79,7 +81,7 @@ pub fn resolve_install_paths(overrides: &PathOverrides) -> Result<InstallPaths> 
         bin_path,
         hook_path,
         rc_file,
-        cache_dir: cache_dir.join("2cp"),
+        cache_dir: cache_dir.join("qtpi"),
     })
 }
 
@@ -90,6 +92,7 @@ pub fn print_shell_hook(paths: &InstallPaths) -> String {
 pub fn install(paths: &InstallPaths, force: bool) -> Result<()> {
     ensure_bin_path(&paths.bin_path)?;
     write_hook_file(&paths.hook_path, force)?;
+    remove_legacy_hook_file(paths)?;
     let mut rc_contents = read_optional_file(&paths.rc_file)?;
     rc_contents = upsert_managed_block(
         &rc_contents,
@@ -124,6 +127,8 @@ pub fn uninstall(paths: &InstallPaths) -> Result<()> {
             });
         }
     }
+
+    remove_legacy_hook_file(paths)?;
 
     Ok(())
 }
@@ -228,13 +233,13 @@ fn rc_file_check(path: &Path) -> DoctorCheck {
                 DoctorCheck {
                     name: "rc_file".to_string(),
                     status: CheckStatus::Ok,
-                    detail: format!("managed 2cp block present in {}", path.display()),
+                    detail: format!("managed qtpi block present in {}", path.display()),
                 }
             } else {
                 DoctorCheck {
                     name: "rc_file".to_string(),
                     status: CheckStatus::Warning,
-                    detail: format!("managed 2cp block missing from {}", path.display()),
+                    detail: format!("managed qtpi block missing from {}", path.display()),
                 }
             }
         }
@@ -367,6 +372,33 @@ fn write_hook_file(path: &Path, force: bool) -> Result<()> {
     write_atomic(path, EMBEDDED_ZSH_HOOK.as_bytes())
 }
 
+fn remove_legacy_hook_file(paths: &InstallPaths) -> Result<()> {
+    let legacy_hook_path = paths
+        .hook_path
+        .parent()
+        .and_then(Path::parent)
+        .map(|config_root| config_root.join("2cp").join("zsh").join("twocp.zsh"));
+
+    let Some(legacy_hook_path) = legacy_hook_path else {
+        return Ok(());
+    };
+
+    if legacy_hook_path == paths.hook_path {
+        return Ok(());
+    }
+
+    match fs::remove_file(&legacy_hook_path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error).with_context(|| {
+            format!(
+                "failed to remove legacy hook file at {}",
+                legacy_hook_path.display()
+            )
+        }),
+    }
+}
+
 fn write_atomic(path: &Path, contents: &[u8]) -> Result<()> {
     let parent = path
         .parent()
@@ -394,7 +426,7 @@ fn write_atomic(path: &Path, contents: &[u8]) -> Result<()> {
 fn file_name_or_default(path: &Path) -> String {
     path.file_name()
         .and_then(|name| name.to_str())
-        .unwrap_or("twocp")
+        .unwrap_or("qtpi")
         .to_string()
 }
 
@@ -408,7 +440,7 @@ fn read_optional_file(path: &Path) -> Result<String> {
 
 fn managed_block(bin_path: &Path, hook_path: &Path) -> String {
     format!(
-        "{START_MARKER}\nexport TWOCP_BIN={}\nsource {}\n{END_MARKER}\n",
+        "{START_MARKER}\nexport QTPI_BIN={}\nsource {}\n{END_MARKER}\n",
         shell_quote_path(bin_path),
         shell_quote_path(hook_path)
     )
@@ -464,17 +496,29 @@ fn remove_managed_block(contents: &str) -> Result<String> {
 }
 
 fn managed_block_range(contents: &str) -> Result<Option<(usize, usize)>> {
-    let Some(start) = contents.find(START_MARKER) else {
-        return Ok(None);
-    };
+    managed_block_range_for_markers(contents, START_MARKER, END_MARKER)
+        .or_else(|| {
+            managed_block_range_for_markers(contents, LEGACY_START_MARKER, LEGACY_END_MARKER)
+        })
+        .transpose()
+}
+
+fn managed_block_range_for_markers(
+    contents: &str,
+    start_marker: &str,
+    end_marker: &str,
+) -> Option<Result<(usize, usize)>> {
+    let start = contents.find(start_marker)?;
     let Some(end_marker_start) = contents[start..]
-        .find(END_MARKER)
+        .find(end_marker)
         .map(|offset| start + offset)
     else {
-        bail!("found managed start marker without matching end marker");
+        return Some(Err(anyhow!(
+            "found managed start marker without matching end marker"
+        )));
     };
-    let end = line_end_after(contents, end_marker_start + END_MARKER.len());
-    Ok(Some((start, end)))
+    let end = line_end_after(contents, end_marker_start + end_marker.len());
+    Some(Ok((start, end)))
 }
 
 fn line_end_after(contents: &str, start: usize) -> usize {
@@ -532,7 +576,7 @@ mod tests {
 
     #[test]
     fn upsert_managed_block_appends_to_new_rc_file() {
-        let block = managed_block(Path::new("/bin/twocp"), Path::new("/tmp/twocp.zsh"));
+        let block = managed_block(Path::new("/bin/qtpi"), Path::new("/tmp/qtpi.zsh"));
         let updated = upsert_managed_block("", &block).expect("block should append");
         assert_eq!(updated, block);
     }
@@ -542,20 +586,54 @@ mod tests {
         let original = "\
 export PATH=/bin\n\
 \n\
-# >>> 2cp >>>\n\
-export TWOCP_BIN='old'\n\
+# >>> qtpi >>>\n\
+export QTPI_BIN='old'\n\
 source 'old-hook'\n\
-# <<< 2cp <<<\n";
-        let replacement = managed_block(Path::new("/new/twocp"), Path::new("/new/twocp.zsh"));
+# <<< qtpi <<<\n";
+        let replacement = managed_block(Path::new("/new/qtpi"), Path::new("/new/qtpi.zsh"));
         let updated = upsert_managed_block(original, &replacement).expect("block should replace");
 
         assert!(updated.contains("export PATH=/bin"));
-        assert!(updated.contains("/new/twocp.zsh"));
+        assert!(updated.contains("/new/qtpi.zsh"));
         assert!(!updated.contains("old-hook"));
     }
 
     #[test]
     fn remove_managed_block_preserves_unrelated_rc_content() {
+        let original = "\
+export PATH=/bin\n\
+\n\
+# >>> qtpi >>>\n\
+export QTPI_BIN='old'\n\
+source 'old-hook'\n\
+# <<< qtpi <<<\n\
+\n\
+alias gs='git status'\n";
+        let updated = remove_managed_block(original).expect("block should remove");
+
+        assert_eq!(updated, "export PATH=/bin\n\nalias gs='git status'\n");
+    }
+
+    #[test]
+    fn upsert_managed_block_replaces_legacy_block() {
+        let original = "\
+export PATH=/bin\n\
+\n\
+# >>> 2cp >>>\n\
+export TWOCP_BIN='old'\n\
+source 'old-hook'\n\
+# <<< 2cp <<<\n";
+        let replacement = managed_block(Path::new("/new/qtpi"), Path::new("/new/qtpi.zsh"));
+        let updated =
+            upsert_managed_block(original, &replacement).expect("legacy block should replace");
+
+        assert!(updated.contains(START_MARKER));
+        assert!(!updated.contains(LEGACY_START_MARKER));
+        assert!(!updated.contains("old-hook"));
+    }
+
+    #[test]
+    fn remove_managed_block_removes_legacy_block() {
         let original = "\
 export PATH=/bin\n\
 \n\
@@ -565,7 +643,7 @@ source 'old-hook'\n\
 # <<< 2cp <<<\n\
 \n\
 alias gs='git status'\n";
-        let updated = remove_managed_block(original).expect("block should remove");
+        let updated = remove_managed_block(original).expect("legacy block should remove");
 
         assert_eq!(updated, "export PATH=/bin\n\nalias gs='git status'\n");
     }
@@ -576,9 +654,9 @@ alias gs='git status'\n";
         let home_dir = tempdir.path().join("home");
         let config_dir = home_dir.join(".config");
         let cache_dir = home_dir.join(".cache");
-        let bin_path = tempdir.path().join("bin").join("twocp");
+        let bin_path = tempdir.path().join("bin").join("qtpi");
         let rc_file = home_dir.join(".zshrc");
-        let hook_path = config_dir.join("2cp").join("zsh").join("twocp.zsh");
+        let hook_path = config_dir.join("qtpi").join("zsh").join("qtpi.zsh");
 
         fs::create_dir_all(bin_path.parent().expect("bin parent"))
             .expect("bin parent should exist");
@@ -591,7 +669,7 @@ alias gs='git status'\n";
             bin_path: bin_path.clone(),
             hook_path: hook_path.clone(),
             rc_file: rc_file.clone(),
-            cache_dir: cache_dir.join("2cp"),
+            cache_dir: cache_dir.join("qtpi"),
         };
         install(&paths, false).expect("install should succeed");
 

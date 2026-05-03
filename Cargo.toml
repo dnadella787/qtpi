@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/twocp-build", "crates/twocp-cli", "crates/twocp-core"]
+members = ["crates/qtpi-build", "crates/qtpi-cli", "crates/qtpi-core"]
 resolver = "2"
 
 [workspace.package]

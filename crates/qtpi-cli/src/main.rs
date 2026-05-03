@@ -8,19 +8,19 @@ use std::path::PathBuf;
 
 use anyhow::{Result, anyhow, bail};
 use clap::{Parser, Subcommand, ValueEnum};
-use serde::Serialize;
-use twocp_core::engine::SuggestEngine;
-use twocp_core::protocol::{
+use qtpi_core::engine::SuggestEngine;
+use qtpi_core::protocol::{
     ReplaceRange, RequestMode, ResponseStatus, ShellKind, SuggestRequest, SuggestResponse,
     SuggestionKind, TerminalCapabilities,
 };
-use twocp_core::providers::{ProviderCatalog, ProviderSourceKind};
-use twocp_core::spec::{ProviderCapabilities, ProviderId};
+use qtpi_core::providers::{ProviderCatalog, ProviderSourceKind};
+use qtpi_core::spec::{ProviderCapabilities, ProviderId};
+use serde::Serialize;
 
 #[derive(Parser)]
 #[command(
-    name = "twocp",
-    about = "Phase 4 multi-CLI shell bridge and dynamic lookup surface for 2cp"
+    name = "qtpi",
+    about = "Phase 4 multi-CLI shell bridge and dynamic lookup surface for qtpi"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -162,7 +162,7 @@ fn main() -> Result<()> {
 
     match cli.command.unwrap_or(Command::ListBuiltins) {
         Command::BuildProvider { input, output } => {
-            twocp_build::compile_json_file_to_file(&input, &output)?;
+            qtpi_build::compile_json_file_to_file(&input, &output)?;
             println!("compiled provider artifact to {}", output.display());
         }
         Command::PrintShellHook {
@@ -194,7 +194,7 @@ fn main() -> Result<()> {
             })?;
             admin::install(&paths, force)?;
             println!(
-                "installed 2cp zsh hook at {} and updated {}",
+                "installed qtpi zsh hook at {} and updated {}",
                 paths.hook_path.display(),
                 paths.rc_file.display()
             );
@@ -214,7 +214,7 @@ fn main() -> Result<()> {
             let _ = bin_path;
             admin::uninstall(&paths)?;
             println!(
-                "removed 2cp zsh hook at {} and cleaned {}",
+                "removed qtpi zsh hook at {} and cleaned {}",
                 paths.hook_path.display(),
                 paths.rc_file.display()
             );
@@ -483,9 +483,9 @@ struct DebugRequestSummary {
 struct DebugResponseSummary {
     status: ResponseStatus,
     selected_provider_id: Option<ProviderId>,
-    parser_status: Option<twocp_core::parser::ParserStatus>,
-    timings: twocp_core::protocol::TimingDiagnostics,
-    dynamic_lookup: Option<twocp_core::protocol::DynamicLookupDiagnostics>,
+    parser_status: Option<qtpi_core::parser::ParserStatus>,
+    timings: qtpi_core::protocol::TimingDiagnostics,
+    dynamic_lookup: Option<qtpi_core::protocol::DynamicLookupDiagnostics>,
     replacement_range: Option<ReplaceRange>,
     suggestions: Vec<DebugSuggestion>,
 }
@@ -768,28 +768,28 @@ fn render_zsh_response(
         .unwrap_or_default();
 
     output.push_str(&format!(
-        "typeset -g __twocp_status={}\n",
+        "typeset -g __qtpi_status={}\n",
         shell_quote(match response.status {
-            twocp_core::protocol::ResponseStatus::Ok => "ok",
-            twocp_core::protocol::ResponseStatus::NoMatch => "no_match",
-            twocp_core::protocol::ResponseStatus::Degraded => "degraded",
-            twocp_core::protocol::ResponseStatus::Error => "error",
+            qtpi_core::protocol::ResponseStatus::Ok => "ok",
+            qtpi_core::protocol::ResponseStatus::NoMatch => "no_match",
+            qtpi_core::protocol::ResponseStatus::Degraded => "degraded",
+            qtpi_core::protocol::ResponseStatus::Error => "error",
         })
     ));
     output.push_str(&format!(
-        "typeset -gi __twocp_replace_start={replace_start}\n\
-typeset -gi __twocp_replace_end={replace_end}\n\
-typeset -gi __twocp_selection_index={selection_index}\n\
-typeset -gi __twocp_truncated_count={}\n\
-typeset -gi __twocp_request_cursor={cursor_char_offset}\n\
-typeset -gi __twocp_lookup_count={lookup_count}\n\
-typeset -gi __twocp_lookup_time_ms={lookup_time_ms}\n\
-typeset -g __twocp_provider_id={}\n\
-typeset -g __twocp_parser_status={}\n\
-typeset -g __twocp_request_buffer={}\n\
-typeset -g __twocp_dynamic_slot_id={}\n\
-typeset -g __twocp_lookup_status={}\n\
-typeset -g __twocp_cache_status={}\n",
+        "typeset -gi __qtpi_replace_start={replace_start}\n\
+typeset -gi __qtpi_replace_end={replace_end}\n\
+typeset -gi __qtpi_selection_index={selection_index}\n\
+typeset -gi __qtpi_truncated_count={}\n\
+typeset -gi __qtpi_request_cursor={cursor_char_offset}\n\
+typeset -gi __qtpi_lookup_count={lookup_count}\n\
+typeset -gi __qtpi_lookup_time_ms={lookup_time_ms}\n\
+typeset -g __qtpi_provider_id={}\n\
+typeset -g __qtpi_parser_status={}\n\
+typeset -g __qtpi_request_buffer={}\n\
+typeset -g __qtpi_dynamic_slot_id={}\n\
+typeset -g __qtpi_lookup_status={}\n\
+typeset -g __qtpi_cache_status={}\n",
         response.render_model.truncated_count,
         shell_quote(provider_id),
         shell_quote(&parser_status),
@@ -799,35 +799,35 @@ typeset -g __twocp_cache_status={}\n",
         shell_quote(&cache_status),
     ));
 
-    output.push_str("typeset -ga __twocp_insert_texts=(");
+    output.push_str("typeset -ga __qtpi_insert_texts=(");
     for suggestion in &response.suggestions {
         output.push(' ');
         output.push_str(&shell_quote(&suggestion.insert_text));
     }
     output.push_str(" )\n");
 
-    output.push_str("typeset -ga __twocp_displays=(");
+    output.push_str("typeset -ga __qtpi_displays=(");
     for suggestion in &response.suggestions {
         output.push(' ');
         output.push_str(&shell_quote(&suggestion.display));
     }
     output.push_str(" )\n");
 
-    output.push_str("typeset -ga __twocp_annotations=(");
+    output.push_str("typeset -ga __qtpi_annotations=(");
     for suggestion in &response.suggestions {
         output.push(' ');
         output.push_str(&shell_quote(suggestion.annotation.as_deref().unwrap_or("")));
     }
     output.push_str(" )\n");
 
-    output.push_str("typeset -ga __twocp_kinds=(");
+    output.push_str("typeset -ga __qtpi_kinds=(");
     for suggestion in &response.suggestions {
         output.push(' ');
         output.push_str(&shell_quote(match suggestion.kind {
-            twocp_core::protocol::SuggestionKind::Command => "command",
-            twocp_core::protocol::SuggestionKind::Flag => "flag",
-            twocp_core::protocol::SuggestionKind::Value => "value",
-            twocp_core::protocol::SuggestionKind::Help => "help",
+            qtpi_core::protocol::SuggestionKind::Command => "command",
+            qtpi_core::protocol::SuggestionKind::Flag => "flag",
+            qtpi_core::protocol::SuggestionKind::Value => "value",
+            qtpi_core::protocol::SuggestionKind::Help => "help",
         }));
     }
     output.push_str(" )\n");
@@ -843,7 +843,7 @@ fn shell_quote(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use twocp_core::parser::{ParseDegradedReason, UnsupportedSyntax};
+    use qtpi_core::parser::{ParseDegradedReason, UnsupportedSyntax};
 
     fn debug_args(buffer: &str, cursor: usize) -> DebugRequestArgs {
         DebugRequestArgs {
@@ -871,7 +871,7 @@ mod tests {
         );
         assert_eq!(
             report.response.parser_status,
-            Some(twocp_core::parser::ParserStatus::Complete)
+            Some(qtpi_core::parser::ParserStatus::Complete)
         );
         assert_eq!(report.response.status, ResponseStatus::Ok);
         assert!(!report.response.suggestions.is_empty());
@@ -888,7 +888,7 @@ mod tests {
         assert!(report.response.suggestions.is_empty());
         assert_eq!(
             report.response.parser_status,
-            Some(twocp_core::parser::ParserStatus::Degraded(
+            Some(qtpi_core::parser::ParserStatus::Degraded(
                 ParseDegradedReason::UnsupportedSyntax(UnsupportedSyntax::CommandSubstitution),
             ))
         );

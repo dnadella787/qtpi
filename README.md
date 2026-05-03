@@ -1,12 +1,12 @@
-# 2cp
+# qtpi
 
-`2cp` is a Rust-first terminal autocomplete project aimed at IntelliSense-style dropdown suggestions for command-line workflows across multiple CLIs.
+`qtpi` is a Rust-first terminal autocomplete project aimed at IntelliSense-style dropdown suggestions for command-line workflows across multiple CLIs.
 
 The immediate target is a local installable tool that helps users discover and complete commands from inside the terminal, starting with `zsh` and proving the model first on `git`.
 
 ## Current Status
 
-Phase 5A is implemented on top of the multi-CLI built-in prototype. The workspace now includes the Phase 1 Rust-side foundation, a suggestion engine for built-in `git` and `kubectl`, shell-facing `twocp suggest`, `install`, `uninstall`, `print-shell-hook`, and `doctor` commands, a thin `zsh` bridge with a zsh-owned 5-row overlay renderer driven by shell-managed selection state, and live provider-owned lookup paths for git branches plus high-value kubectl resource names, namespaces, and contexts with explicit cache and degraded-mode behavior.
+Phase 5A is implemented on top of the multi-CLI built-in prototype. The workspace now includes the Phase 1 Rust-side foundation, a suggestion engine for built-in `git` and `kubectl`, shell-facing `qtpi suggest`, `install`, `uninstall`, `print-shell-hook`, and `doctor` commands, a thin `zsh` bridge with a zsh-owned 5-row overlay renderer driven by shell-managed selection state, and live provider-owned lookup paths for git branches plus high-value kubectl resource names, namespaces, and contexts with explicit cache and degraded-mode behavior.
 
 The current interactive path remains intentionally narrow:
 
@@ -16,7 +16,7 @@ The current interactive path remains intentionally narrow:
 - enum-backed value suggestions such as `kubectl get --output `
 - dynamic git branch lookup for `git checkout <target>`, `git switch <branch>`, `git merge <branch>`, and `git rebase <upstream>`
 - dynamic kubectl lookup for common resource names, `--namespace`, `--context`, and `kubectl config use-context <context>`
-- explicit 2cp keybindings that leave native completion unchanged
+- explicit qtpi keybindings that leave native completion unchanged
 
 External plugin runtime loading and additional CLIs remain future work. Dynamic lookup is intentionally narrow in the current build and only covers the first `kubectl` pod-name slot.
 
@@ -30,9 +30,9 @@ External plugin runtime loading and additional CLIs remain future work. Dynamic 
 
 ## Workspace Layout
 
-- `crates/twocp-cli/`: CLI entrypoint plus developer-facing `build-provider` and built-in fixture smoke surface
-- `crates/twocp-core/`: core contracts, parser-boundary types, provider interfaces, registry, and artifact loading
-- `crates/twocp-build/`: provider source-data compiler for deterministic runtime artifacts
+- `crates/qtpi-cli/`: CLI entrypoint plus developer-facing `build-provider` and built-in fixture smoke surface
+- `crates/qtpi-core/`: core contracts, parser-boundary types, provider interfaces, registry, and artifact loading
+- `crates/qtpi-build/`: provider source-data compiler for deterministic runtime artifacts
 - `providers-src/`: minimal provider source-data fixtures compiled into embedded artifacts at build time
 - `shell/zsh/`: repo-local `zsh` integration script for the first interactive path
 - `docs/`: product, architecture, and implementation planning notes
@@ -47,8 +47,8 @@ cargo fmt --all
 cargo check --workspace
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
-zsh shell/zsh/twocp_state_test.zsh
-cargo run -p twocp-cli -- doctor --shell zsh
+zsh shell/zsh/qtpi_state_test.zsh
+cargo run -p qtpi-cli -- doctor --shell zsh
 ```
 
 ## Next Development Step
@@ -60,43 +60,43 @@ Finish the rest of Phase 5B after the debug CLI surface: harden release packagin
 Install the current `zsh` integration into the default config path and managed `~/.zshrc` block:
 
 ```bash
-cargo run -p twocp-cli -- install --shell zsh
+cargo run -p qtpi-cli -- install --shell zsh
 ```
 
 Print the managed shell snippet without editing files:
 
 ```bash
-cargo run -p twocp-cli -- print-shell-hook --shell zsh
+cargo run -p qtpi-cli -- print-shell-hook --shell zsh
 ```
 
 Inspect the current install state and a static `git ` sanity check:
 
 ```bash
-cargo run -p twocp-cli -- doctor --shell zsh
+cargo run -p qtpi-cli -- doctor --shell zsh
 ```
 
 Inspect the normalized request, provider selection, parser state, timings, replacement range, and top suggestions for a single suggest call:
 
 ```bash
-cargo run -p twocp-cli -- debug request --buffer 'git ' --cursor 4 --cwd . --format text
+cargo run -p qtpi-cli -- debug request --buffer 'git ' --cursor 4 --cwd . --format text
 ```
 
 Inspect the compact render model that the `zsh` bridge would paint:
 
 ```bash
-cargo run -p twocp-cli -- debug render --buffer 'git ' --cursor 4 --cwd . --max-suggestions 5
+cargo run -p qtpi-cli -- debug render --buffer 'git ' --cursor 4 --cwd . --max-suggestions 5
 ```
 
 Inspect built-in provider metadata from the current root index and catalog:
 
 ```bash
-cargo run -p twocp-cli -- debug provider git --format json
+cargo run -p qtpi-cli -- debug provider git --format json
 ```
 
 Remove the managed shell block and installed hook file:
 
 ```bash
-cargo run -p twocp-cli -- uninstall --shell zsh
+cargo run -p qtpi-cli -- uninstall --shell zsh
 ```
 
 ## Zsh Prototype
@@ -105,8 +105,8 @@ Build the binary, then source the repo-local bridge:
 
 ```bash
 cargo build
-TWOCP_BIN="$PWD/target/debug/twocp"
-source "$PWD/shell/zsh/twocp.zsh"
+QTPI_BIN="$PWD/target/debug/qtpi"
+source "$PWD/shell/zsh/qtpi.zsh"
 ```
 
 Current interaction:
@@ -128,23 +128,23 @@ Current interaction:
 - `Ctrl-C` dismisses the current suggestion list and then falls through to native shell interrupt behavior
 - `Tab` and normal `zsh` completion remain owned by the user's existing shell setup
 
-The candidate set remains bounded by `TWOCP_MAX_SUGGESTIONS`. The prototype
+The candidate set remains bounded by `QTPI_MAX_SUGGESTIONS`. The prototype
 dropdown intentionally renders exactly 5 visible rows and does not expose a row
 count override. If the terminal cannot safely support cursor-addressed overlay
-painting, 2cp disables the dropdown for that session instead of falling back to
+painting, qtpi disables the dropdown for that session instead of falling back to
 `complist`.
 
 Auto-show roots default to `git`, `kubectl`, and `k`. Override them before
-sourcing the bridge with `TWOCP_AUTO_ROOTS`.
+sourcing the bridge with `QTPI_AUTO_ROOTS`.
 
-The default 2cp keybindings can be overridden before sourcing the bridge with
-`TWOCP_KEY_SHOW` using `bindkey` notation. `Enter` defaults to both `^M`
-and `^J`, and can be overridden with `TWOCP_KEY_ENTER` and
-`TWOCP_KEY_ENTER_ALT`. `Esc` defaults to `^[` and can be overridden with
-`TWOCP_KEY_ESCAPE`. `Ctrl-C` defaults to `^C` and can be overridden with
-`TWOCP_KEY_INTERRUPT`.
+The default qtpi keybindings can be overridden before sourcing the bridge with
+`QTPI_KEY_SHOW` using `bindkey` notation. `Enter` defaults to both `^M`
+and `^J`, and can be overridden with `QTPI_KEY_ENTER` and
+`QTPI_KEY_ENTER_ALT`. `Esc` defaults to `^[` and can be overridden with
+`QTPI_KEY_ESCAPE`. `Ctrl-C` defaults to `^C` and can be overridden with
+`QTPI_KEY_INTERRUPT`.
 
-The repo-local shell regression harness lives at `shell/zsh/twocp_state_test.zsh`.
+The repo-local shell regression harness lives at `shell/zsh/qtpi_state_test.zsh`.
 It exercises show and typed-refresh state, scroll-window movement, clamping, and
 clean invalidation directly against the internal zsh helpers, including the
 missing-binary degraded path. It does not try to assert terminal cursor painting.

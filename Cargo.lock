@@ -357,6 +357,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "qtpi-build"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "qtpi-core",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "qtpi-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "qtpi-build",
+ "qtpi-core",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "qtpi-core"
+version = "0.1.0"
+dependencies = [
+ "postcard",
+ "serde",
+]
+
+[[package]]
 name = "quote"
 version = "1.0.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -511,38 +543,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "twocp-build"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "serde",
- "serde_json",
- "tempfile",
- "twocp-core",
-]
-
-[[package]]
-name = "twocp-cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "serde",
- "serde_json",
- "tempfile",
- "twocp-build",
- "twocp-core",
-]
-
-[[package]]
-name = "twocp-core"
-version = "0.1.0"
-dependencies = [
- "postcard",
- "serde",
 ]
 
 [[package]]

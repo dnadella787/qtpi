@@ -8,16 +8,16 @@ use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use serde::{Deserialize, Serialize};
-use twocp_core::artifact::ArtifactDecodeError;
-use twocp_core::providers::{
+use qtpi_core::artifact::ArtifactDecodeError;
+use qtpi_core::providers::{
     ArtifactProvider, DynamicValueProvider, Provider, ProviderCandidate, ProviderQuery,
     ProviderRootSummary, ProviderScope,
 };
-use twocp_core::spec::{
+use qtpi_core::spec::{
     CacheStatus, DynamicLookupRequest, DynamicLookupResult, DynamicLookupStatus, LookupMatch,
     ProviderId,
 };
+use serde::{Deserialize, Serialize};
 
 const DEFAULT_CACHE_TTL_MS: u32 = 5_000;
 const DEFAULT_TIMEOUT_MS: u32 = 80;
@@ -42,7 +42,7 @@ impl Provider for GitProvider {
         self.artifact.id()
     }
 
-    fn metadata(&self) -> &twocp_core::artifact::CompiledProviderMetadata {
+    fn metadata(&self) -> &qtpi_core::artifact::CompiledProviderMetadata {
         self.artifact.metadata()
     }
 
@@ -214,7 +214,7 @@ fn fetch_branch_snapshot(
     git_bin_override: Option<&PathBuf>,
 ) -> Result<Vec<LookupMatch>, FetchError> {
     let git_bin = git_bin_override.cloned().unwrap_or_else(|| {
-        env::var_os("TWOCP_GIT_BIN")
+        env::var_os("QTPI_GIT_BIN")
             .map(PathBuf::from)
             .unwrap_or_else(|| PathBuf::from("git"))
     });
@@ -288,9 +288,9 @@ fn cache_path(cache_dir_override: Option<&PathBuf>, cache_key: &str) -> PathBuf 
 
 fn cache_dir(cache_dir_override: Option<&PathBuf>) -> PathBuf {
     cache_dir_override.cloned().unwrap_or_else(|| {
-        env::var_os("TWOCP_CACHE_DIR")
+        env::var_os("QTPI_CACHE_DIR")
             .map(PathBuf::from)
-            .unwrap_or_else(|| env::temp_dir().join("twocp-cache").join("git"))
+            .unwrap_or_else(|| env::temp_dir().join("qtpi-cache").join("git"))
     })
 }
 
@@ -419,16 +419,16 @@ fn elapsed_ms(start: Instant) -> u32 {
 mod tests {
     use std::os::unix::fs::PermissionsExt;
 
+    use qtpi_core::providers::Provider;
+    use qtpi_core::spec::{CommandPath, DynamicLookupBudget, DynamicLookupScope, SlotId};
     use tempfile::tempdir;
-    use twocp_core::providers::Provider;
-    use twocp_core::spec::{CommandPath, DynamicLookupBudget, DynamicLookupScope, SlotId};
 
     use super::*;
 
     fn git_provider() -> GitProvider {
         GitProvider::from_bytes(include_bytes!(concat!(
             env!("OUT_DIR"),
-            "/git-minimal.twocp-provider"
+            "/git-minimal.qtpi-provider"
         )))
         .expect("git provider should load")
     }
@@ -439,9 +439,9 @@ mod tests {
         let scope = provider.resolve_scope(&ProviderQuery {
             provider_id: ProviderId::from("builtin.git"),
             command_tokens: vec!["checkout".into()],
-            completion_position: twocp_core::parser::CompletionPosition::Value,
+            completion_position: qtpi_core::parser::CompletionPosition::Value,
             active_fragment: String::new(),
-            replace_range: twocp_core::protocol::ReplaceRange {
+            replace_range: qtpi_core::protocol::ReplaceRange {
                 start_byte: 13,
                 end_byte: 13,
             },

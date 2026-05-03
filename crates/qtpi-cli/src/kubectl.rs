@@ -8,16 +8,16 @@ use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use serde::{Deserialize, Serialize};
-use twocp_core::artifact::ArtifactDecodeError;
-use twocp_core::providers::{
+use qtpi_core::artifact::ArtifactDecodeError;
+use qtpi_core::providers::{
     ArtifactProvider, DynamicValueProvider, Provider, ProviderCandidate, ProviderQuery,
     ProviderRootSummary, ProviderScope,
 };
-use twocp_core::spec::{
+use qtpi_core::spec::{
     CacheStatus, DynamicLookupRequest, DynamicLookupResult, DynamicLookupStatus, LookupMatch,
     ProviderId,
 };
+use serde::{Deserialize, Serialize};
 
 const DEFAULT_CACHE_TTL_MS: u32 = 5_000;
 const DEFAULT_TIMEOUT_MS: u32 = 120;
@@ -44,7 +44,7 @@ impl Provider for KubectlProvider {
         self.artifact.id()
     }
 
-    fn metadata(&self) -> &twocp_core::artifact::CompiledProviderMetadata {
+    fn metadata(&self) -> &qtpi_core::artifact::CompiledProviderMetadata {
         self.artifact.metadata()
     }
 
@@ -353,9 +353,9 @@ fn cache_path(cache_dir_override: Option<&PathBuf>, cache_key: &str) -> PathBuf 
 
 fn cache_dir(cache_dir_override: Option<&PathBuf>) -> PathBuf {
     cache_dir_override.cloned().unwrap_or_else(|| {
-        env::var_os("TWOCP_CACHE_DIR")
+        env::var_os("QTPI_CACHE_DIR")
             .map(PathBuf::from)
-            .unwrap_or_else(|| env::temp_dir().join("twocp-cache").join("kubectl"))
+            .unwrap_or_else(|| env::temp_dir().join("qtpi-cache").join("kubectl"))
     })
 }
 
@@ -569,7 +569,7 @@ fn run_kubectl(
     include_namespace_scope: bool,
 ) -> Result<String, FetchError> {
     let kubectl_bin = kubectl_bin_override.cloned().unwrap_or_else(|| {
-        env::var_os("TWOCP_KUBECTL_BIN")
+        env::var_os("QTPI_KUBECTL_BIN")
             .map(PathBuf::from)
             .unwrap_or_else(|| PathBuf::from("kubectl"))
     });
@@ -730,16 +730,16 @@ fn explicit_kubeconfig_arg(request: &DynamicLookupRequest) -> Option<&str> {
 mod tests {
     use std::os::unix::fs::PermissionsExt;
 
+    use qtpi_core::providers::Provider;
+    use qtpi_core::spec::{CommandPath, DynamicLookupBudget, DynamicLookupScope, SlotId};
     use tempfile::tempdir;
-    use twocp_core::providers::Provider;
-    use twocp_core::spec::{CommandPath, DynamicLookupBudget, DynamicLookupScope, SlotId};
 
     use super::*;
 
     fn kubectl_provider() -> KubectlProvider {
         KubectlProvider::from_bytes(include_bytes!(concat!(
             env!("OUT_DIR"),
-            "/kubectl-minimal.twocp-provider"
+            "/kubectl-minimal.qtpi-provider"
         )))
         .expect("kubectl provider should load")
     }
@@ -752,15 +752,15 @@ mod tests {
             command_tokens: vec![
                 "--context=team-a".into(),
                 "--kubeconfig".into(),
-                "/tmp/twocp-kubeconfig".into(),
+                "/tmp/qtpi-kubeconfig".into(),
                 "--namespace".into(),
                 "kube-system".into(),
                 "describe".into(),
                 "pod".into(),
             ],
-            completion_position: twocp_core::parser::CompletionPosition::Value,
+            completion_position: qtpi_core::parser::CompletionPosition::Value,
             active_fragment: String::new(),
-            replace_range: twocp_core::protocol::ReplaceRange {
+            replace_range: qtpi_core::protocol::ReplaceRange {
                 start_byte: 32,
                 end_byte: 32,
             },
@@ -782,7 +782,7 @@ mod tests {
         assert_eq!(scope.lookup_scope.profile.as_deref(), Some("team-a"));
         assert_eq!(
             scope.lookup_scope.region.as_deref(),
-            Some("explicit:/tmp/twocp-kubeconfig")
+            Some("explicit:/tmp/qtpi-kubeconfig")
         );
     }
 
@@ -793,9 +793,9 @@ mod tests {
         let get_scope = provider.resolve_scope(&ProviderQuery {
             provider_id: ProviderId::from("builtin.kubectl"),
             command_tokens: vec!["get".into(), "pods".into()],
-            completion_position: twocp_core::parser::CompletionPosition::Value,
+            completion_position: qtpi_core::parser::CompletionPosition::Value,
             active_fragment: String::new(),
-            replace_range: twocp_core::protocol::ReplaceRange {
+            replace_range: qtpi_core::protocol::ReplaceRange {
                 start_byte: 16,
                 end_byte: 16,
             },
@@ -815,9 +815,9 @@ mod tests {
         let context_scope = provider.resolve_scope(&ProviderQuery {
             provider_id: ProviderId::from("builtin.kubectl"),
             command_tokens: vec!["config".into(), "use-context".into()],
-            completion_position: twocp_core::parser::CompletionPosition::Value,
+            completion_position: qtpi_core::parser::CompletionPosition::Value,
             active_fragment: String::new(),
-            replace_range: twocp_core::protocol::ReplaceRange {
+            replace_range: qtpi_core::protocol::ReplaceRange {
                 start_byte: 27,
                 end_byte: 27,
             },

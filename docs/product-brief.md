@@ -8,7 +8,7 @@ For tools like `git`, `aws`, `kubectl`, `argo`, and `oci`, users often know the 
 
 ## Target Experience
 
-As the user types in the shell, `2cp` should surface a compact, keyboard-friendly dropdown of likely continuations.
+As the user types in the shell, `qtpi` should surface a compact, keyboard-friendly dropdown of likely continuations.
 
 Examples:
 

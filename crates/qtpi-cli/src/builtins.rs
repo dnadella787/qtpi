@@ -1,19 +1,19 @@
 use std::collections::BTreeMap;
 
-use twocp_core::artifact::PROVIDER_ARTIFACT_SCHEMA_VERSION;
-use twocp_core::providers::{
+use qtpi_core::artifact::PROVIDER_ARTIFACT_SCHEMA_VERSION;
+use qtpi_core::providers::{
     ArtifactProvider, CatalogError, Provider, ProviderCatalog, ProviderRootIndex,
     ProviderRootIndexEntry, ProviderSourceKind,
 };
-use twocp_core::spec::ProviderId;
+use qtpi_core::spec::ProviderId;
 
 use crate::git::GitProvider;
 use crate::kubectl::KubectlProvider;
 
 static GIT_MINIMAL_PROVIDER: &[u8] =
-    include_bytes!(concat!(env!("OUT_DIR"), "/git-minimal.twocp-provider"));
+    include_bytes!(concat!(env!("OUT_DIR"), "/git-minimal.qtpi-provider"));
 static KUBECTL_MINIMAL_PROVIDER: &[u8] =
-    include_bytes!(concat!(env!("OUT_DIR"), "/kubectl-minimal.twocp-provider"));
+    include_bytes!(concat!(env!("OUT_DIR"), "/kubectl-minimal.qtpi-provider"));
 
 pub struct BuiltinCatalog {
     root_index: ProviderRootIndex,
@@ -113,9 +113,9 @@ pub fn builtin_summary(provider_id: &ProviderId) -> Result<(String, usize, usize
 #[cfg(test)]
 mod tests {
     use super::*;
-    use twocp_core::artifact::decode_artifact;
-    use twocp_core::engine::SuggestEngine;
-    use twocp_core::protocol::{ShellKind, SuggestRequest};
+    use qtpi_core::artifact::decode_artifact;
+    use qtpi_core::engine::SuggestEngine;
+    use qtpi_core::protocol::{ShellKind, SuggestRequest};
 
     #[test]
     fn built_in_catalog_indexes_git_and_kubectl() {

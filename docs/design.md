@@ -1,8 +1,8 @@
-# 2cp Design Doc
+# qtpi Design Doc
 
 ## Summary
 
-`2cp` is a local Rust application that adds IntelliSense-style autocomplete to the terminal without replacing the shell. It is designed as a multi-CLI suggestion system with a thin shell bridge, a shared provider model, deterministic ranking, and lightweight dropdown rendering.
+`qtpi` is a local Rust application that adds IntelliSense-style autocomplete to the terminal without replacing the shell. It is designed as a multi-CLI suggestion system with a thin shell bridge, a shared provider model, deterministic ranking, and lightweight dropdown rendering.
 
 The product starts with `zsh` as the first shell target and `git` as the first validation target, but the architecture is intended to support additional CLI ecosystems such as `aws`, `kubectl`, `argo`, and `oci` without redesigning the shell integration layer.
 
@@ -95,7 +95,7 @@ The shell bridge is shell-specific code, starting with `zsh`, that:
 
 - hooks into interactive line editing at controlled points
 - gathers the current input line, cursor position, and shell context
-- invokes `2cp` with a structured request
+- invokes `qtpi` with a structured request
 - renders or coordinates rendering of suggestion output
 - accepts a chosen suggestion and updates the shell buffer predictably
 
@@ -107,7 +107,7 @@ The default execution model is stateless per request:
 
 1. user types in the shell
 2. `zsh` hook captures the current editable buffer and cursor position
-3. shell bridge sends a request to `2cp`
+3. shell bridge sends a request to `qtpi`
 4. Rust engine parses input, selects a provider, computes suggestions, and emits a structured response
 5. shell bridge renders the response and applies user selection back into the shell buffer
 
@@ -541,7 +541,7 @@ The initial `zsh` bridge should:
 - install with a clearly named script
 - register explicit hooks
 - allow easy disablement
-- fail open back to normal shell behavior if `2cp` is unavailable
+- fail open back to normal shell behavior if `qtpi` is unavailable
 
 The shell bridge should pass only structured state, not CLI-specific logic. Command-specific intelligence belongs in providers.
 
@@ -552,13 +552,13 @@ The `zsh` bridge needs to be specified as a product contract, not deferred to im
 Design assumptions:
 
 - `zle` remains the owner of the editable shell buffer
-- `2cp` augments normal editing; it does not replace the prompt or become a replacement shell
+- `qtpi` augments normal editing; it does not replace the prompt or become a replacement shell
 - suggestion lifecycle is driven by explicit `zle` hook points and key handlers
 
 Minimum bridge responsibilities:
 
 - capture `BUFFER`, `CURSOR`, and current working directory
-- invoke `2cp` on bounded suggestion triggers
+- invoke `qtpi` on bounded suggestion triggers
 - render the dropdown from Rust-provided row data without taking ownership of the full terminal session
 - map accept, dismiss, and movement keys to shell-buffer-safe operations
 - clear stale UI on prompt redraw or known invalidation events
@@ -599,7 +599,7 @@ Ownership rules:
 Coexistence rules:
 
 - the bridge must not permanently break native completion widgets
-- users must be able to disable `2cp` and fall back to normal completion
+- users must be able to disable `qtpi` and fall back to normal completion
 - prompt frameworks or custom widgets should not need deep integration to function
 
 Future shell targets:
@@ -820,7 +820,7 @@ The design should explicitly cover these cases:
 - remote sessions over SSH
 - non-interactive or non-TTY execution
 - unsupported terminal capabilities
-- crashed or missing `2cp` binary
+- crashed or missing `qtpi` binary
 
 Expected recovery behavior:
 
@@ -849,10 +849,10 @@ The system should support explicit developer-facing diagnostics.
 
 Recommended early commands:
 
-- `2cp doctor`
-- `2cp debug request`
-- `2cp debug provider <name>`
-- `2cp debug render`
+- `qtpi doctor`
+- `qtpi debug request`
+- `qtpi debug provider <name>`
+- `qtpi debug render`
 
 Useful diagnostics:
 
@@ -940,11 +940,11 @@ CI can remain lightweight initially, but the design should assume that shell int
 
 The current single-crate scaffold is acceptable for now, but the likely medium-term layout is:
 
-- `crates/twocp-cli`: CLI entrypoint and developer commands
-- `crates/twocp-core`: request model, provider registry, ranking engine
-- `crates/twocp-render`: render-model shaping and any future shared terminal-control helpers justified by real shell-painting pain
-- `crates/twocp-shell-zsh`: packaging or assets for zsh integration
-- `crates/twocp-providers`: shared provider interfaces and built-in providers
+- `crates/qtpi-cli`: CLI entrypoint and developer commands
+- `crates/qtpi-core`: request model, provider registry, ranking engine
+- `crates/qtpi-render`: render-model shaping and any future shared terminal-control helpers justified by real shell-painting pain
+- `crates/qtpi-shell-zsh`: packaging or assets for zsh integration
+- `crates/qtpi-providers`: shared provider interfaces and built-in providers
 
 This split should happen only when real code pressure justifies it. Premature crate fragmentation will slow the project down.
 
@@ -981,7 +981,7 @@ Scope:
 
 Deliverables:
 
-- `twocp-core`-style core model modules or their equivalent inside the existing crate layout
+- `qtpi-core`-style core model modules or their equivalent inside the existing crate layout
 - request, parse, suggestion, and render-model types compiled and tested
 - provider interface with `dynamic_lookup` request and response contracts
 - compiled-provider artifact schema with explicit versioning
@@ -1173,4 +1173,4 @@ Reason:
 
 ## Recommendation
 
-Build `2cp` as a Rust-first, single-process, multi-provider autocomplete engine with a thin `zsh` bridge and deterministic ranking. Use `git` to prove the interaction loop quickly, but design the provider model, request contract, and ranking engine from day one around broader CLI families such as `aws`, `kubectl`, `argo`, and `oci`.
+Build `qtpi` as a Rust-first, single-process, multi-provider autocomplete engine with a thin `zsh` bridge and deterministic ranking. Use `git` to prove the interaction loop quickly, but design the provider model, request contract, and ranking engine from day one around broader CLI families such as `aws`, `kubectl`, `argo`, and `oci`.

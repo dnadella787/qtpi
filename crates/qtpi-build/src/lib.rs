@@ -3,11 +3,11 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::{Context, Result, bail};
-use serde::{Deserialize, Serialize};
-use twocp_core::artifact::{CompiledProviderArtifact, CompiledProviderMetadata, encode_artifact};
-use twocp_core::spec::{
+use qtpi_core::artifact::{CompiledProviderArtifact, CompiledProviderMetadata, encode_artifact};
+use qtpi_core::spec::{
     ArgumentSpec, CommandNode, CommandNodeKind, FlagSpec, ProviderCapabilities, ProviderId,
 };
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProviderSourceFile {
@@ -161,8 +161,8 @@ fn normalize_command_node(node: &mut CommandNode) {
 mod tests {
     use std::path::PathBuf;
 
+    use qtpi_core::artifact::decode_artifact;
     use tempfile::tempdir;
-    use twocp_core::artifact::decode_artifact;
 
     use super::*;
 
@@ -201,7 +201,7 @@ mod tests {
         let input = tempdir.path().join("git.json");
         let output = tempdir
             .path()
-            .join(PathBuf::from("nested/git.twocp-provider"));
+            .join(PathBuf::from("nested/git.qtpi-provider"));
         fs::write(&input, git_fixture_json()).expect("fixture should write");
 
         compile_json_file_to_file(&input, &output).expect("compile should pass");

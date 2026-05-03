@@ -31,13 +31,13 @@ These boundaries are useful even before separate crates exist:
 
 The repo now uses a small three-crate split that matches the Phase 1 delivery plan without introducing shell or render crates early:
 
-- `twocp-cli`: composition layer, developer commands, and embedded built-in fixture registration
-- `twocp-core`: canonical request and response types, parser-boundary modeling, provider traits, registry, and compiled-artifact loading
-- `twocp-build`: provider source-data parsing, validation, and runtime artifact compilation
+- `qtpi-cli`: composition layer, developer commands, and embedded built-in fixture registration
+- `qtpi-core`: canonical request and response types, parser-boundary modeling, provider traits, registry, and compiled-artifact loading
+- `qtpi-build`: provider source-data parsing, validation, and runtime artifact compilation
 
 This keeps authoring-format parsing out of the runtime crate while preserving a single artifact contract for both embedded built-ins and later external providers.
 
-Phase 2 adds a repo-local `shell/zsh/twocp.zsh` bridge instead of a new shell crate. That keeps the early integration explicit and easy to remove while the widget contract is still settling.
+Phase 2 adds a repo-local `shell/zsh/qtpi.zsh` bridge instead of a new shell crate. That keeps the early integration explicit and easy to remove while the widget contract is still settling.
 
 Phase 3 keeps the same crate layout while adding a built-in provider-root index and a second validation CLI. Exact root discovery is now a small startup contract separate from provider instantiation, so the suggest path can select `git` or `kubectl` without eagerly deserializing unrelated providers.
 

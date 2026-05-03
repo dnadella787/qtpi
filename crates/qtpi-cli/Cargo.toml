@@ -1,5 +1,5 @@
 [package]
-name = "twocp-cli"
+name = "qtpi-cli"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -7,7 +7,7 @@ rust-version.workspace = true
 build = "build.rs"
 
 [[bin]]
-name = "twocp"
+name = "qtpi"
 path = "src/main.rs"
 
 [dependencies]
@@ -15,11 +15,11 @@ anyhow.workspace = true
 clap.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-twocp-build = { path = "../twocp-build" }
-twocp-core = { path = "../twocp-core" }
+qtpi-build = { path = "../qtpi-build" }
+qtpi-core = { path = "../qtpi-core" }
 
 [build-dependencies]
-twocp-build = { path = "../twocp-build" }
+qtpi-build = { path = "../qtpi-build" }
 
 [dev-dependencies]
 tempfile.workspace = true
